@@ -56,4 +56,4 @@ Remove-Item -Recurse -Force $Staging
 
 $mb = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 Write-Host "OK: $ZipPath ($mb MB)"
-Write-Host "GitHub: Releases -> New release -> прикрепить $ZipName (отдельно от portable)"
+Write-Host "GitHub: Releases -> attach $ZipName (tag v1.0.0-models)"

@@ -6,6 +6,11 @@ on:
     branches: [main, master]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      models_bundle_url:
+        description: "URL ZIP с весами (опционально; иначе Release v1.0.0-models или HuggingFace)"
+        required: false
+        type: string
 
 concurrency:
   group: portable-${{ github.workflow }}-${{ github.ref }}
@@ -14,7 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: write
 
@@ -33,6 +38,14 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Install model weights into models/
+        shell: pwsh
+        env:
+          MODELS_BUNDLE_URL: ${{ inputs.models_bundle_url || vars.MODELS_BUNDLE_URL || '' }}
+          MODELS_RELEASE_TAG: v1.0.0-models
+          MODELS_ASSET_NAME: AOI-Web-models-1.0.0.zip
+        run: python -m scripts.ci_install_models
 
       - name: Prepare bundle inputs
         shell: pwsh
@@ -73,7 +86,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: portable-win64
+          name: portable-win64-with-models
           path: ${{ env.ZIP_PATH }}
           retention-days: 30
 
