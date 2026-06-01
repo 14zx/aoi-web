@@ -197,12 +197,39 @@ def _pick_listen_port(preferred: int) -> int:
     return preferred
 
 
+def _resolve_bundle_base() -> Path:
+    """Корень данных portable (``_internal``) или корень проекта в dev."""
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        internal = exe_dir / "_internal"
+        return internal if internal.is_dir() else exe_dir
+    return Path(__file__).resolve().parent.parent
+
+
 def _base_dir() -> Path:
     # app.config.BASE_DIR points to PyInstaller's _internal directory in a
     # one-dir build, and to the project root in normal source execution.
     from app.config import BASE_DIR
 
     return Path(BASE_DIR)
+
+
+def _ensure_model_weights_env(base: Path) -> None:
+    """Если в bundle есть ``aoi_unified.pt``, а .env указывает на отсутствующий файл — исправить."""
+    unified = base / "models" / "aoi_unified.pt"
+    if not unified.is_file():
+        return
+
+    raw = os.environ.get("MODEL_WEIGHTS_PATH", "").strip()
+    if raw:
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            candidate = base / candidate
+        if candidate.is_file():
+            return
+
+    os.environ["MODEL_WEIGHTS_PATH"] = "models/aoi_unified.pt"
+    print(f"MODEL_WEIGHTS_PATH={os.environ['MODEL_WEIGHTS_PATH']} ({unified.name} found)", flush=True)
 
 
 def _ensure_certs(base: Path) -> None:
@@ -254,6 +281,8 @@ def main() -> int:
         print(f"Исполняемый файл: {sys.executable}", flush=True)
 
     port = _listen_port()
+    bundle_base = _resolve_bundle_base()
+    _ensure_model_weights_env(bundle_base)
     base = _base_dir()
     os.chdir(base)
 

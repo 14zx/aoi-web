@@ -24,6 +24,21 @@ def main() -> int:
         shutil.copy(env_example, env_file)
         print(f"Copied {env_example.name} -> .env")
 
+    unified = root / "models" / "aoi_unified.pt"
+    if unified.is_file() and env_file.is_file():
+        text = env_file.read_text(encoding="utf-8")
+        line = "MODEL_WEIGHTS_PATH=models/aoi_unified.pt"
+        if "MODEL_WEIGHTS_PATH=" in text:
+            import re
+
+            text = re.sub(r"^MODEL_WEIGHTS_PATH=.*$", line, text, flags=re.MULTILINE)
+        else:
+            text = text.rstrip() + "\n" + line + "\n"
+        env_file.write_text(text, encoding="utf-8")
+        print(f"Patched .env -> {line}")
+    elif not unified.is_file():
+        print("WARN: models/aoi_unified.pt missing — portable will use fallback unless datasets are active")
+
     storage = root / "storage"
     for sub in ("images", "training", "golden_boards"):
         (storage / sub).mkdir(parents=True, exist_ok=True)

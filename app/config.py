@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 15
 
     # ---- Модель детекции (ТЗ п. 4.1.3) ----
-    model_weights_path: Path = BASE_DIR / "models" / "yolov8_deeppcb.pt"
+    model_weights_path: Path = BASE_DIR / "models" / "aoi_unified.pt"
     detection_conf_threshold: float = 0.25
     detection_iou_threshold: float = 0.45
     detection_img_size: int = 640

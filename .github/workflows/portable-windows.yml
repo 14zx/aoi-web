@@ -50,6 +50,13 @@ jobs:
           MODELS_ASSET_NAME: AOI-Web-models-1.0.0.zip
         run: python -m scripts.ci_install_models
 
+      - name: Verify models before PyInstaller
+        shell: pwsh
+        run: |
+          python -m scripts.verify_models
+          Get-ChildItem models -Recurse -Filter *.pt | Measure-Object -Property Length -Sum |
+            ForEach-Object { "models/*.pt: $($_.Count) files, $([math]::Round($_.Sum/1MB,1)) MB" }
+
       - name: Prepare bundle inputs
         shell: pwsh
         run: python -m scripts.ci_prepare_portable_bundle

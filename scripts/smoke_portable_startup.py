@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 OK_MARKER = "Application startup complete"
+YOLO_MARKER = "Загружены веса YOLOv8"
 FAIL_MARKERS = ("Could not import module", "Traceback", "Error loading ASGI")
 TIMEOUT_S = 45
 
@@ -87,8 +88,26 @@ def main() -> int:
         for line in lines[-20:]:
             print(line)
 
+    blob = ""
+    for path in (err_path, out_path):
+        if path.exists():
+            blob += path.read_text(encoding="utf-8", errors="replace")
+
+    unified = cwd / "_internal" / "models" / "aoi_unified.pt"
+    if not unified.is_file():
+        unified = cwd / "models" / "aoi_unified.pt"
+    if unified.is_file():
+        mb = unified.stat().st_size / (1024 * 1024)
+        print(f"OK: bundled weights {unified} ({mb:.1f} MiB)")
+    else:
+        print("WARN: models/aoi_unified.pt not in portable folder", file=sys.stderr)
+
     if ok:
         print("OK: Application startup complete")
+        if YOLO_MARKER not in blob:
+            print("WARN: YOLO weights were not loaded (check MODEL_WEIGHTS_PATH in .env)", file=sys.stderr)
+        else:
+            print("OK: YOLO weights loaded")
         return 0
 
     print("FAIL: smoke test did not see 'Application startup complete'", file=sys.stderr)
