@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -20,10 +22,18 @@ ROOT = Path(__file__).resolve().parent.parent
 MODELS = ROOT / "models"
 
 
-def _download(url: str, dest: Path) -> None:
+def _auth_headers(accept: str = "*/*") -> dict[str, str]:
+    headers = {"User-Agent": "AOI-Web-CI", "Accept": accept}
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _download(url: str, dest: Path, *, headers: dict[str, str] | None = None) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"GET {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "AOI-Web-CI"})
+    req = urllib.request.Request(url, headers=headers or _auth_headers())
     with urllib.request.urlopen(req, timeout=600) as resp, dest.open("wb") as out:
         shutil.copyfileobj(resp, out)
     print(f"  -> {dest} ({dest.stat().st_size / (1024 * 1024):.1f} MiB)")
@@ -55,13 +65,47 @@ def _try_bundle_url(url: str) -> bool:
             return False
 
 
-def _default_release_url() -> str | None:
+def _try_github_release_bundle() -> bool:
+    """Download models ZIP from a GitHub Release (works for private repos with GITHUB_TOKEN)."""
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
     tag = os.environ.get("MODELS_RELEASE_TAG", "v1.0.0-models").strip()
+    asset_name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.0.zip").strip()
     if not repo or not tag:
-        return None
-    name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.0.zip")
-    return f"https://github.com/{repo}/releases/download/{tag}/{name}"
+        return False
+
+    api_url = f"https://api.github.com/repos/{repo}/releases/tags/{urllib.parse.quote(tag)}"
+    print(f"GitHub API release: {tag}")
+    req = urllib.request.Request(
+        api_url,
+        headers=_auth_headers("application/vnd.github+json"),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            release = json.load(resp)
+    except OSError as exc:
+        print(f"WARN: release lookup failed: {exc}", file=sys.stderr)
+        return False
+
+    assets = release.get("assets") or []
+    asset = next((a for a in assets if a.get("name") == asset_name), None)
+    if not asset:
+        print(f"WARN: asset {asset_name!r} not on release {tag}", file=sys.stderr)
+        return False
+
+    asset_api = asset["url"]
+    with tempfile.TemporaryDirectory() as tmp:
+        zpath = Path(tmp) / asset_name
+        try:
+            _download(
+                asset_api,
+                zpath,
+                headers=_auth_headers("application/octet-stream"),
+            )
+            _extract_models_zip(zpath)
+            return True
+        except OSError as exc:
+            print(f"WARN: release asset download failed: {exc}", file=sys.stderr)
+            return False
 
 
 def _download_public_presets() -> None:
@@ -84,12 +128,11 @@ def main() -> int:
     MODELS.mkdir(parents=True, exist_ok=True)
 
     url = os.environ.get("MODELS_BUNDLE_URL", "").strip()
-    if not url:
-        url = _default_release_url() or ""
-
     got_bundle = _try_bundle_url(url) if url else False
+    if not got_bundle:
+        got_bundle = _try_github_release_bundle()
     if not got_bundle and not _list_pt():
-        print("Архив весов не найден — скачиваю публичные пресеты (без aoi_unified.pt)...")
+        print("WARN: models bundle missing; downloading public presets (no aoi_unified.pt)...")
         _download_public_presets()
 
     pts = _list_pt()

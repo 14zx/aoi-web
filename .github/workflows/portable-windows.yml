@@ -42,6 +42,9 @@ jobs:
       - name: Install model weights into models/
         shell: pwsh
         env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODELS_BUNDLE_URL: ${{ inputs.models_bundle_url || vars.MODELS_BUNDLE_URL || '' }}
           MODELS_RELEASE_TAG: v1.0.0-models
           MODELS_ASSET_NAME: AOI-Web-models-1.0.0.zip
