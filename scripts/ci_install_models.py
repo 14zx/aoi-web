@@ -68,8 +68,8 @@ def _try_bundle_url(url: str) -> bool:
 def _try_github_release_bundle() -> bool:
     """Download models ZIP from a GitHub Release (works for private repos with GITHUB_TOKEN)."""
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
-    tag = os.environ.get("MODELS_RELEASE_TAG", "v1.0.0-models").strip()
-    asset_name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.0.zip").strip()
+    tag = os.environ.get("MODELS_RELEASE_TAG", "v1.0.1").strip()
+    asset_name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.1.zip").strip()
     if not repo or not tag:
         return False
 

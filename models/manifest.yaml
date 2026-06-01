@@ -32,4 +32,28 @@ files:
   - path: datasets/1/weights.pt
     required: false
     in_git: false
-    description: Зарегистрированный датасет #1 (после download_datasets)
+    description: Датасет #1 (вкладка «Датасеты» в админке)
+  - path: datasets/2/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #2
+  - path: datasets/3/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #3
+  - path: datasets/4/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #4
+  - path: datasets/5/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #5
+  - path: datasets/6/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #6
+  - path: datasets/7/weights.pt
+    required: false
+    in_git: false
+    description: Датасет #7

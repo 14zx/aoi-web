@@ -46,8 +46,8 @@ jobs:
           PYTHONIOENCODING: utf-8
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODELS_BUNDLE_URL: ${{ inputs.models_bundle_url || vars.MODELS_BUNDLE_URL || '' }}
-          MODELS_RELEASE_TAG: v1.0.0-models
-          MODELS_ASSET_NAME: AOI-Web-models-1.0.0.zip
+          MODELS_RELEASE_TAG: v1.0.1
+          MODELS_ASSET_NAME: AOI-Web-models-1.0.1.zip
         run: python -m scripts.ci_install_models
 
       - name: Verify models before PyInstaller
@@ -104,5 +104,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: ${{ env.ZIP_PATH }}
+          make_latest: true
           generate_release_notes: true

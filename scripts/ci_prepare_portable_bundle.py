@@ -65,6 +65,13 @@ def main() -> int:
     else:
         print(f"Using existing {db.name}")
 
+    print("Seeding datasets 1..7 from models/datasets/*/weights.pt ...")
+    subprocess.run(
+        [sys.executable, "-m", "scripts.seed_portable_datasets"],
+        cwd=root,
+        check=True,
+    )
+
     print("CI portable bundle prerequisites OK")
     return 0
 
