@@ -215,9 +215,9 @@ def _base_dir() -> Path:
 
 
 def _ensure_model_weights_env(base: Path) -> None:
-    """Если в bundle есть ``aoi_unified.pt``, а .env указывает на отсутствующий файл — исправить."""
-    unified = base / "models" / "aoi_unified.pt"
-    if not unified.is_file():
+    """Point MODEL_WEIGHTS_PATH at bundled ``datasets/7/weights.pt`` when needed."""
+    primary = base / "models" / "datasets" / "7" / "weights.pt"
+    if not primary.is_file():
         return
 
     raw = os.environ.get("MODEL_WEIGHTS_PATH", "").strip()
@@ -228,8 +228,8 @@ def _ensure_model_weights_env(base: Path) -> None:
         if candidate.is_file():
             return
 
-    os.environ["MODEL_WEIGHTS_PATH"] = "models/aoi_unified.pt"
-    print(f"MODEL_WEIGHTS_PATH={os.environ['MODEL_WEIGHTS_PATH']} ({unified.name} found)", flush=True)
+    os.environ["MODEL_WEIGHTS_PATH"] = "models/datasets/7/weights.pt"
+    print(f"MODEL_WEIGHTS_PATH={os.environ['MODEL_WEIGHTS_PATH']} (dataset 7)", flush=True)
 
 
 def _ensure_certs(base: Path) -> None:

@@ -93,14 +93,14 @@ def main() -> int:
         if path.exists():
             blob += path.read_text(encoding="utf-8", errors="replace")
 
-    unified = cwd / "_internal" / "models" / "aoi_unified.pt"
-    if not unified.is_file():
-        unified = cwd / "models" / "aoi_unified.pt"
-    if unified.is_file():
-        mb = unified.stat().st_size / (1024 * 1024)
-        print(f"OK: bundled weights {unified} ({mb:.1f} MiB)")
+    primary = cwd / "_internal" / "models" / "datasets" / "7" / "weights.pt"
+    if not primary.is_file():
+        primary = cwd / "models" / "datasets" / "7" / "weights.pt"
+    if primary.is_file():
+        mb = primary.stat().st_size / (1024 * 1024)
+        print(f"OK: bundled weights {primary} ({mb:.1f} MiB)")
     else:
-        print("WARN: models/aoi_unified.pt not in portable folder", file=sys.stderr)
+        print("WARN: models/datasets/7/weights.pt not in portable folder", file=sys.stderr)
 
     if ok:
         print("OK: Application startup complete")

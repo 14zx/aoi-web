@@ -1,59 +1,13 @@
-# Ожидаемые файлы весов (см. models/README.md). В Git не коммитятся — только манифест.
-# required: true — без файла детектор может уйти в fallback или не найти активный датасет.
-
+# Expected weight files (see models/README.md). *.pt are not committed to Git.
 version: 1
 
 files:
   - path: unified_classes.yaml
     required: true
     in_git: true
-    description: Реестр унифицированных классов
+    description: Unified class registry
 
-  - path: aoi_unified.pt
+  - path: datasets/7/weights.pt
     required: true
     in_git: false
-    description: Основная модель проекта (инспекция)
-
-  - path: pretrained/pcb-defects-6cls/yolov8n_pcb_defects_6cls.pt
-    required: false
-    in_git: false
-    description: Публичный пресет PKU / 6 классов дефектов трассировки
-
-  - path: pretrained/pcb-defect-seg/yolov8n_pcb_defect_seg.pt
-    required: false
-    in_git: false
-    description: Сегментация дефектов PCB
-
-  - path: pretrained/welding-defects/yolov8_welding_defects.pt
-    required: false
-    in_git: false
-    description: Дефекты пайки (демо)
-
-  - path: datasets/1/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #1 (вкладка «Датасеты» в админке)
-  - path: datasets/2/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #2
-  - path: datasets/3/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #3
-  - path: datasets/4/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #4
-  - path: datasets/5/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #5
-  - path: datasets/6/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #6
-  - path: datasets/7/weights.pt
-    required: false
-    in_git: false
-    description: Датасет #7
+    description: Primary inspection weights (dataset 7)

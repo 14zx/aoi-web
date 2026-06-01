@@ -1,4 +1,4 @@
-"""Регистрация ``models/datasets/1..7/weights.pt`` в ``aoi.db`` для portable-сборки."""
+"""Register ``models/datasets/7/weights.pt`` in ``aoi.db`` for portable builds."""
 
 from __future__ import annotations
 
@@ -6,56 +6,52 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATASETS_ROOT = ROOT / "models" / "datasets"
+PRIMARY_DATASET_ID = 7
+WEIGHTS = ROOT / "models" / "datasets" / str(PRIMARY_DATASET_ID) / "weights.pt"
+REL_PATH = f"models/datasets/{PRIMARY_DATASET_ID}/weights.pt"
 
 
 def main() -> int:
+    if not WEIGHTS.is_file() or WEIGHTS.stat().st_size == 0:
+        print(f"WARN: missing {WEIGHTS}", file=sys.stderr)
+        return 0
+
     from sqlalchemy import select
 
     from app.database import SessionLocal
     from app.models import Dataset
 
-    created = updated = 0
+    name = f"Dataset {PRIMARY_DATASET_ID}"
+    size = WEIGHTS.stat().st_size
+
     with SessionLocal() as db:
-        for sub in sorted(DATASETS_ROOT.iterdir(), key=lambda p: p.name):
-            if not sub.is_dir() or not sub.name.isdigit():
-                continue
-            weights = sub / "weights.pt"
-            if not weights.is_file() or weights.stat().st_size == 0:
-                continue
-            ds_id = int(sub.name)
-            rel = f"models/datasets/{ds_id}/weights.pt"
-            name = f"Dataset {ds_id}"
-            size = weights.stat().st_size
-            row = db.get(Dataset, ds_id)
-            if row is None:
-                row = db.execute(select(Dataset).where(Dataset.name == name)).scalar_one_or_none()
-            if row is None:
-                db.add(
-                    Dataset(
-                        id=ds_id,
-                        name=name,
-                        description="Веса из portable / Release (models bundle)",
-                        file_path=rel,
-                        file_size=size,
-                        original_filename="weights.pt",
-                        is_active=False,
-                    )
+        for row in db.execute(select(Dataset)).scalars().all():
+            row.is_active = False
+
+        row = db.get(Dataset, PRIMARY_DATASET_ID)
+        if row is None:
+            row = db.execute(select(Dataset).where(Dataset.name == name)).scalar_one_or_none()
+        if row is None:
+            db.add(
+                Dataset(
+                    id=PRIMARY_DATASET_ID,
+                    name=name,
+                    description="Primary model (portable / Release)",
+                    file_path=REL_PATH,
+                    file_size=size,
+                    original_filename="weights.pt",
+                    is_active=True,
                 )
-                created += 1
-                print(f"ADD  id={ds_id} {rel}")
-            else:
-                row.file_path = rel
-                row.file_size = size
-                row.original_filename = row.original_filename or "weights.pt"
-                updated += 1
-                print(f"UPD  id={row.id} {rel}")
+            )
+            print(f"ADD  id={PRIMARY_DATASET_ID} {REL_PATH} (active)")
+        else:
+            row.file_path = REL_PATH
+            row.file_size = size
+            row.is_active = True
+            print(f"UPD  id={row.id} {REL_PATH} (active)")
         db.commit()
 
-    if not created and not updated:
-        print("WARN: no models/datasets/*/weights.pt found", file=sys.stderr)
-        return 0
-    print(f"OK: datasets seeded (created={created}, updated={updated})")
+    print("OK: primary dataset seeded")
     return 0
 
 

@@ -47,8 +47,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODELS_BUNDLE_URL: ${{ inputs.models_bundle_url || vars.MODELS_BUNDLE_URL || '' }}
-          MODELS_RELEASE_TAG: v1.0.1
-          MODELS_ASSET_NAME: AOI-Web-models-1.0.1.zip
+          MODELS_RELEASE_TAG: v1.0.2
+          MODELS_ASSET_NAME: AOI-Web-models-1.0.2.zip
         run: python -m scripts.ci_install_models
 
       - name: Verify models before PyInstaller

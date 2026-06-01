@@ -68,8 +68,8 @@ def _try_bundle_url(url: str) -> bool:
 def _try_github_release_bundle() -> bool:
     """Download models ZIP from a GitHub Release (works for private repos with GITHUB_TOKEN)."""
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
-    tag = os.environ.get("MODELS_RELEASE_TAG", "v1.0.1").strip()
-    asset_name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.1.zip").strip()
+    tag = os.environ.get("MODELS_RELEASE_TAG", "v1.0.2").strip()
+    asset_name = os.environ.get("MODELS_ASSET_NAME", "AOI-Web-models-1.0.2.zip").strip()
     if not repo or not tag:
         return False
 
@@ -131,30 +131,21 @@ def main() -> int:
     got_bundle = _try_bundle_url(url) if url else False
     if not got_bundle:
         got_bundle = _try_github_release_bundle()
-    if not got_bundle and not _list_pt():
-        print("WARN: models bundle missing; downloading public presets (no aoi_unified.pt)...")
-        _download_public_presets()
+    primary = MODELS / "datasets" / "7" / "weights.pt"
+    if not got_bundle and not primary.is_file():
+        print("WARN: models bundle missing and no datasets/7/weights.pt locally", file=sys.stderr)
 
     pts = _list_pt()
-    print(f"\nФайлов .pt в models/: {len(pts)}")
+    print(f"\n.pt files under models/: {len(pts)}")
     for p in pts[:20]:
         print(f"  {p.relative_to(ROOT)} ({p.stat().st_size / (1024 * 1024):.1f} MiB)")
     if len(pts) > 20:
-        print(f"  ... и ещё {len(pts) - 20}")
+        print(f"  ... +{len(pts) - 20} more")
 
-    unified = MODELS / "aoi_unified.pt"
-    if not unified.is_file():
-        print(
-            "WARN: нет models/aoi_unified.pt — загрузите Release с полным архивом "
-            "(см. models/README.md, scripts/package_models_release.ps1).",
-            file=sys.stderr,
-        )
-    else:
-        print(f"OK: {unified.name}")
-
-    if not pts:
-        print("ERROR: в models/ нет ни одного .pt", file=sys.stderr)
+    if not primary.is_file():
+        print("ERROR: missing models/datasets/7/weights.pt", file=sys.stderr)
         return 1
+    print(f"OK: {primary.relative_to(ROOT)}")
     return 0
 
 
