@@ -1,4 +1,4 @@
-"""Проверка наличия файлов весов по ``models/manifest.yaml``."""
+"""Verify model weight files listed in ``models/manifest.yaml``."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ MANIFEST = MODELS / "manifest.yaml"
 
 def main() -> int:
     if not MANIFEST.is_file():
-        print(f"Нет манифеста: {MANIFEST}", file=sys.stderr)
+        print(f"ERROR: missing manifest: {MANIFEST}", file=sys.stderr)
         return 1
 
     data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8")) or {}
@@ -34,21 +34,21 @@ def main() -> int:
             print(f"OK   {rel}")
         elif required:
             missing_required.append(rel)
-            print(f"НЕТ  {rel}  (обязательный)")
+            print(f"MISS {rel}  (required)", file=sys.stderr)
         else:
             missing_optional.append(rel)
-            print(f"—    {rel}  (опционально)")
+            print(f"SKIP {rel}  (optional)")
 
     print()
-    print(f"Найдено файлов: {ok}")
+    print(f"Found: {ok} file(s)")
     if missing_optional:
-        print(f"Опционально отсутствует: {len(missing_optional)}")
+        print(f"Optional missing: {len(missing_optional)}")
     if missing_required:
-        print(f"Обязательных нет: {len(missing_required)}", file=sys.stderr)
-        print("См. models/README.md — архив Release или scripts.download_*", file=sys.stderr)
+        print(f"Required missing: {len(missing_required)}", file=sys.stderr)
+        print("See models/README.md or Release AOI-Web-models-*.zip", file=sys.stderr)
         return 1
 
-    print("Проверка пройдена.")
+    print("verify_models: OK")
     return 0
 
 

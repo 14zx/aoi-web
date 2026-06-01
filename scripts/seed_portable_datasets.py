@@ -25,7 +25,7 @@ def main() -> int:
                 continue
             ds_id = int(sub.name)
             rel = f"models/datasets/{ds_id}/weights.pt"
-            name = f"Датасет {ds_id}"
+            name = f"Dataset {ds_id}"
             size = weights.stat().st_size
             row = db.get(Dataset, ds_id)
             if row is None:
