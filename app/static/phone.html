@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <title>АОИ · Камера</title>
+  <link rel="stylesheet" href="/static/phone.css" />
+</head>
+<body>
+  <!-- Полноэкранный видоискатель -->
+  <main class="stage" id="stage">
+    <video id="preview" autoplay playsinline muted></video>
+
+    <!-- Верхняя панель: имя устройства, статус, FPS, заряд -->
+    <header class="topbar">
+      <div class="device-title" id="deviceTitle">Камера</div>
+      <div class="topbar-right">
+        <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+        <span class="status-text" id="statusText">Готов</span>
+      </div>
+    </header>
+
+    <!-- Правая панель с быстрыми настройками -->
+    <aside class="side-controls" id="sideControls">
+      <button type="button" class="round-btn" id="qualityBtn" title="Качество">
+        <span id="qualityLabel">HD</span>
+      </button>
+      <button type="button" class="round-btn" id="flipBtn" title="Переключить камеру" aria-label="Переключить камеру">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M9 4V2L5 5l4 3V6c3.86 0 7 3.14 7 7a6.99 6.99 0 0 1-7 7v2c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-7 9a9 9 0 0 0 3.28 6.93l1.42-1.42A7 7 0 0 1 4 13H2z"/></svg>
+      </button>
+      <button type="button" class="round-btn" id="torchBtn" title="Вспышка" aria-label="Вспышка" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+      </button>
+      <button type="button" class="round-btn" id="fullscreenBtn" title="Полный экран" aria-label="Полный экран">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/></svg>
+      </button>
+    </aside>
+
+    <!-- Нижняя панель: начать/остановить, счётчик кадров, битрейт -->
+    <footer class="bottombar">
+      <div class="stats">
+        <span id="fpsLabel">0 к/с</span>
+        <span class="sep">•</span>
+        <span id="sizeLabel">—</span>
+        <span class="sep">•</span>
+        <span id="sentLabel">0 кадров</span>
+      </div>
+      <div class="record-wrap">
+        <button type="button" class="record-btn" id="recordBtn" aria-label="Старт/стоп">
+          <span class="record-dot" id="recordDot"></span>
+        </button>
+      </div>
+      <div class="mini-actions">
+        <button type="button" class="ghost-btn" id="infoBtn" title="Инфо" aria-label="Инфо">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-11h2V7h-2v2z"/></svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Диалог выбора качества -->
+    <div class="sheet" id="qualitySheet" hidden>
+      <div class="sheet-inner">
+        <h3>Качество трансляции</h3>
+        <p class="muted">Выше разрешение и FPS — лучше картинка, но больше нагрузка на сеть.</p>
+        <div class="options" id="qualityOptions">
+          <button type="button" data-preset="sd">
+            <strong>SD</strong><span>854 × 480 · 5 к/с · 70%</span>
+          </button>
+          <button type="button" data-preset="hd">
+            <strong>HD</strong><span>1280 × 720 · 8 к/с · 82%</span>
+          </button>
+          <button type="button" data-preset="fhd">
+            <strong>Full HD</strong><span>1920 × 1080 · 10 к/с · 88%</span>
+          </button>
+          <button type="button" data-preset="max">
+            <strong>Максимум</strong><span>Нативная камера · 12 к/с · 92%</span>
+          </button>
+        </div>
+        <button type="button" class="close-btn" id="qualityClose">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- Информационный оверлей/ошибка -->
+    <div class="overlay" id="overlay">
+      <div class="overlay-inner">
+        <h2 id="overlayTitle">Подключение…</h2>
+        <p id="overlayText" class="muted"></p>
+        <button type="button" class="primary-btn" id="overlayAction" hidden>Начать трансляцию</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/phone.js?v=32"></script>
+</body>
+</html>

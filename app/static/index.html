@@ -1,0 +1,874 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f2937" />
+  <title>АОИ-Web — автоматическая оптическая инспекция печатных узлов</title>
+  <link rel="stylesheet" href="/static/styles.css?v=39" />
+</head>
+<body>
+  <!-- Экран входа -->
+  <section id="screen-login" class="screen screen--login is-active">
+    <form id="login-form" class="card login-card" autocomplete="on">
+      <h1 class="login-title">АОИ-Web</h1>
+      <p class="login-subtitle">Автоматическая оптическая инспекция печатных узлов</p>
+
+      <label class="field">
+        <span>Логин</span>
+        <input type="text" name="username" autocomplete="username" required minlength="3" maxlength="64" />
+      </label>
+      <label class="field">
+        <span>Пароль</span>
+        <input type="password" name="password" autocomplete="current-password" required minlength="1" maxlength="128" />
+      </label>
+
+      <button type="submit" class="btn btn--primary btn--block">Войти</button>
+      <p id="login-error" class="error" role="alert" aria-live="polite"></p>
+      <p class="login-hint">
+        Стандартная учётная запись — см. <code>.env</code>.
+      </p>
+    </form>
+  </section>
+
+  <!-- Основное приложение -->
+  <section id="screen-app" class="screen screen--app">
+    <header class="topbar">
+      <div class="topbar__title">
+        <strong>АОИ-Web</strong>
+        <span class="topbar__code">АОИ.2026.Паксин П. П.</span>
+      </div>
+      <div class="topbar__user">
+        <span id="device-badge" class="badge" hidden></span>
+        <span id="user-label"></span>
+        <button type="button" id="btn-logout" class="btn btn--ghost" title="Выход">Выйти</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="tab-inspect" role="tab">Инспекция</button>
+      <button class="tab" data-tab="tab-history" role="tab">Журнал</button>
+      <button class="tab" data-tab="tab-devices" role="tab">Устройства</button>
+      <button class="tab is-hidden-operator" data-tab="tab-stats" role="tab">Статистика</button>
+      <button class="tab is-hidden-operator" data-tab="tab-users" role="tab">Пользователи</button>
+      <button class="tab is-hidden-operator" data-tab="tab-datasets" role="tab">Датасеты</button>
+      <button class="tab is-hidden-operator is-hidden-non-admin" data-tab="tab-settings" role="tab">Настройки</button>
+      <button class="tab is-hidden-operator" data-tab="tab-audit" role="tab">Логи</button>
+      <button class="tab is-hidden-operator" data-tab="tab-golden-boards" role="tab">Эталоны</button>
+    </nav>
+
+    <!-- Вкладка: инспекция -->
+    <article id="tab-inspect" class="tab-panel is-active">
+      <div class="card">
+        <h2>Новая инспекция</h2>
+        <p class="hint">Поддерживаются JPEG/PNG ≥ 640×640 пикселей. Для живого анализа используйте режим «Live».</p>
+
+        <div id="no-device-warn" class="status warn" hidden>
+          Вы не закрепили устройство. Перейдите на вкладку «Устройства», чтобы взять одну из зарегистрированных камер в работу — или подключите свой телефон как камеру.
+        </div>
+
+        <div class="source-toggle">
+          <button type="button" class="chip is-active" data-source="remote">Поток устройства</button>
+          <button type="button" class="chip" data-source="camera">Локальная камера</button>
+          <button type="button" class="chip" data-source="file">Файл</button>
+        </div>
+
+        <!-- Поток с удалённого устройства (телефона, зарегистрированного как камера) -->
+        <div id="source-remote" class="source-pane is-active">
+          <div id="remote-empty" class="status">
+            Возьмите устройство-камеру на вкладке «Устройства». Его видеопоток появится здесь.
+          </div>
+          <div id="remote-view" hidden>
+            <div class="camera" id="remote-camera">
+              <div class="camera-zoom-stack">
+                <img id="remote-img" alt="Поток устройства" />
+                <canvas id="remote-overlay" class="overlay" aria-hidden="true"></canvas>
+              </div>
+            </div>
+
+            <!-- Удалённое управление телефоном (как в приложении «Камера» на самом телефоне) -->
+            <div id="remote-controls" class="remote-controls" hidden>
+              <div class="rc-group">
+                <button type="button" class="btn btn--primary" data-rc="toggle" id="rc-rec">Начать запись</button>
+              </div>
+              <div class="rc-sep"></div>
+              <div class="rc-group">
+                <span class="rc-label">Подсветка:</span>
+                <button type="button" class="btn btn--secondary" data-rc="torch_on">Вкл.</button>
+                <button type="button" class="btn btn--ghost" data-rc="torch_off" style="color:#111">Выкл.</button>
+              </div>
+              <div class="rc-sep"></div>
+              <div class="rc-group" id="rc-quality">
+                <span class="rc-label">Качество:</span>
+                <button type="button" class="btn btn--ghost chip-preset" data-preset="sd"  style="color:#111">SD</button>
+                <button type="button" class="btn btn--ghost chip-preset" data-preset="hd"  style="color:#111">HD</button>
+                <button type="button" class="btn btn--ghost chip-preset" data-preset="fhd" style="color:#111">FullHD</button>
+                <button type="button" class="btn btn--ghost chip-preset" data-preset="max" style="color:#111">MAX</button>
+              </div>
+              <div class="rc-sep"></div>
+              <div class="rc-group">
+                <button type="button" class="btn btn--ghost" data-rc="flip" style="color:#111" title="Переключить камеру (фронт/тыл)">⟲ Камера</button>
+              </div>
+              <div class="rc-sep"></div>
+              <div class="rc-group rc-bright">
+                <span class="rc-label">Яркость:</span>
+                <input type="range" id="rc-brightness" min="0.6" max="1.8" step="0.05" value="1" />
+                <button type="button" class="btn btn--ghost" id="rc-bright-reset" style="color:#111" title="Сбросить яркость">↺</button>
+              </div>
+              <div class="rc-sep"></div>
+              <div class="rc-group rc-zoom">
+                <span class="rc-label">Масштаб:</span>
+                <input type="range" id="remote-preview-zoom" min="1" max="3" step="0.05" value="1" title="Цифровой зум превью" />
+                <button type="button" class="btn btn--ghost" id="rc-zoom-reset" style="color:#111" title="Сбросить масштаб">↺</button>
+              </div>
+              <span id="rc-msg" class="live-stats">—</span>
+            </div>
+            <p class="hint hint--remote-zoom">Над кадром: колёсико мыши или два пальца (pinch) — масштаб, как в камере телефона.</p>
+
+            <div class="live-bar">
+              <label class="toggle">
+                <input type="checkbox" id="chk-live-remote" />
+                <span>Live-анализ поверх потока</span>
+              </label>
+              <span id="remote-stats" class="live-stats">—</span>
+            </div>
+            <div class="toolbar toolbar--sticky">
+              <button type="button" id="btn-capture-remote" class="btn btn--primary">Снимок и протокол</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="source-camera" class="source-pane">
+          <div class="camera" id="local-camera">
+            <div class="camera-zoom-stack">
+              <video id="video" playsinline autoplay muted></video>
+              <canvas id="overlay" class="overlay" aria-hidden="true"></canvas>
+            </div>
+            <canvas id="canvas" hidden></canvas>
+          </div>
+
+          <div class="local-stream-tools">
+            <div class="rc-group rc-zoom">
+              <span class="rc-label">Масштаб:</span>
+              <input type="range" id="local-preview-zoom" min="1" max="3" step="0.05" value="1" title="Цифровой зум превью" />
+              <button type="button" class="btn btn--ghost" id="local-zoom-reset" style="color:#111" title="Сбросить масштаб">↺</button>
+            </div>
+            <small class="hint">Колёсико над кадром или жест «щипок» двумя пальцами — как в камере телефона.</small>
+          </div>
+
+          <div class="live-bar">
+            <label class="toggle">
+              <input type="checkbox" id="chk-live" />
+              <span>Live-анализ поверх видео</span>
+            </label>
+            <span id="live-stats" class="live-stats">—</span>
+          </div>
+
+          <div class="toolbar toolbar--sticky">
+            <button type="button" id="btn-camera-start" class="btn btn--secondary">Включить камеру</button>
+            <button type="button" id="btn-capture" class="btn btn--primary" disabled>Снимок и протокол</button>
+          </div>
+        </div>
+
+        <div id="source-file" class="source-pane">
+          <label class="dropzone">
+            <input type="file" id="file-input" accept="image/jpeg,image/png" hidden />
+            <span>Нажмите, чтобы выбрать файл, или перетащите сюда изображение</span>
+          </label>
+        </div>
+
+        <label class="field" style="margin-top:12px">
+          <span>Модель платы (необязательно)</span>
+          <input type="text" id="board-model-input" maxlength="255" placeholder="Артикул / ревизия, например PCB-A rev.2" />
+        </label>
+        <label class="field" style="margin-top:8px">
+          <span>Эталон Golden Board (необязательно)</span>
+          <select id="golden-board-profile-id">
+            <option value="">— без эталона —</option>
+          </select>
+        </label>
+
+        <div class="card esp32-panel" style="margin-top:12px;padding:12px 14px">
+          <h3 style="margin:0 0 8px;font-size:1rem">Подсветка стенда (WLED)</h3>
+          <p id="esp32-status-line" class="hint" style="margin:0 0 10px">Статус: проверка…</p>
+
+          <details id="esp32-config-details" class="esp32-config-details is-hidden-non-admin" style="margin-bottom:12px">
+            <summary style="cursor:pointer;font-weight:600">Настройки подключения WLED</summary>
+            <form id="esp32-config-form" class="settings-form" style="margin-top:10px">
+              <label class="field" style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" name="enabled" id="esp32-enabled" />
+                <span>Управлять WLED по сети (JSON API)</span>
+              </label>
+              <fieldset class="field" style="border:0;padding:0;margin:0 0 8px">
+                <legend style="font-weight:600;margin-bottom:6px">Подключение</legend>
+                <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <input type="radio" name="connection_mode" value="auto" />
+                  <span>Авто-поиск в сети (mDNS + /json/nodes)</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px">
+                  <input type="radio" name="connection_mode" value="manual" checked />
+                  <span>Вручную — указать IP/URL</span>
+                </label>
+              </fieldset>
+              <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap">
+                <button type="button" id="btn-wled-discover" class="btn btn--secondary">Найти WLED в сети</button>
+                <span id="wled-discover-msg" class="status"></span>
+              </div>
+              <div id="wled-discover-list" class="hint" style="margin-bottom:10px"></div>
+              <label class="field">
+                <span>Адрес WLED</span>
+                <input type="text" name="base_url" id="esp32-base-url" placeholder="http://192.168.50.130" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Путь статуса (GET)</span>
+                <input type="text" name="health_path" value="/json/info" />
+              </label>
+              <label class="field">
+                <span>Путь состояния (POST)</span>
+                <input type="text" name="control_path" value="/json/state" />
+              </label>
+              <label class="field">
+                <span>ID сегмента</span>
+                <input type="number" name="segment_id" min="0" max="31" step="1" value="0" />
+              </label>
+              <label class="field">
+                <span>Переход (×100 мс)</span>
+                <input type="number" name="transition" min="0" max="65535" step="1" value="7" />
+              </label>
+              <label class="field">
+                <span>Порядок цветов в API</span>
+                <select name="color_order" id="esp32-color-order">
+                  <option value="rgb">Как в палитре (RGB)</option>
+                  <option value="brg">Цикл R→B, G→R, B→G (если красный даёт синий на ленте)</option>
+                  <option value="swap_gb">Поменять только G↔B</option>
+                  <option value="custom">Своя (по калибровке ниже)</option>
+                </select>
+              </label>
+              <details id="wled-color-cal-details" style="margin:0 0 10px">
+                <summary style="cursor:pointer;font-weight:600">Калибровка цвета на ленте</summary>
+                <p class="hint" style="margin:8px 0">
+                  Включите ленту, нажмите «Показать» для чистого цвета из палитры и укажите,
+                  <strong>какой цвет реально горит</strong> на стенде. После трёх шагов нажмите «Применить калибровку».
+                </p>
+                <div class="wled-cal-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+                  <span style="min-width:88px">Красный #FF0000</span>
+                  <button type="button" class="btn btn--ghost wled-cal-test" data-wled-cal="#ff0000">Показать</button>
+                  <label class="field" style="margin:0;min-width:140px">
+                    <span class="hint">На ленте вижу</span>
+                    <select id="wled-cal-seen-r" data-wled-cal-key="r">
+                      <option value="">—</option>
+                      <option value="r">Красный</option>
+                      <option value="g">Зелёный</option>
+                      <option value="b">Синий</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="wled-cal-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+                  <span style="min-width:88px">Зелёный #00FF00</span>
+                  <button type="button" class="btn btn--ghost wled-cal-test" data-wled-cal="#00ff00">Показать</button>
+                  <label class="field" style="margin:0;min-width:140px">
+                    <span class="hint">На ленте вижу</span>
+                    <select id="wled-cal-seen-g" data-wled-cal-key="g">
+                      <option value="">—</option>
+                      <option value="r">Красный</option>
+                      <option value="g">Зелёный</option>
+                      <option value="b">Синий</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="wled-cal-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+                  <span style="min-width:88px">Синий #0000FF</span>
+                  <button type="button" class="btn btn--ghost wled-cal-test" data-wled-cal="#0000ff">Показать</button>
+                  <label class="field" style="margin:0;min-width:140px">
+                    <span class="hint">На ленте вижу</span>
+                    <select id="wled-cal-seen-b" data-wled-cal-key="b">
+                      <option value="">—</option>
+                      <option value="r">Красный</option>
+                      <option value="g">Зелёный</option>
+                      <option value="b">Синий</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="toolbar" style="flex-wrap:wrap;margin-bottom:6px">
+                  <button type="button" id="btn-wled-cal-apply" class="btn btn--secondary">Применить калибровку</button>
+                  <span id="wled-cal-msg" class="status"></span>
+                </div>
+                <p class="hint" id="wled-cal-map-hint" style="margin:0">Карта API: —</p>
+              </details>
+              <label class="field">
+                <span>Таймаут запроса, с</span>
+                <input type="number" name="timeout_sec" min="0.3" max="30" step="0.1" value="2.5" />
+              </label>
+              <div class="toolbar">
+                <button type="submit" class="btn btn--secondary">Сохранить настройки</button>
+                <span id="esp32-config-msg" class="status"></span>
+              </div>
+            </form>
+
+            <details id="wled-debug-details" style="margin-top:14px">
+              <summary style="cursor:pointer;font-weight:600">Отладка WLED (запросы / ответы)</summary>
+              <p class="hint" style="margin:8px 0">Тестовые запросы по JSON API. Видны только администратору.</p>
+              <div class="toolbar" style="flex-wrap:wrap;margin-bottom:8px">
+                <button type="button" class="btn btn--ghost wled-debug-preset" data-wled-path="/json/info" data-wled-method="GET">GET /json/info</button>
+                <button type="button" class="btn btn--ghost wled-debug-preset" data-wled-path="/json/state" data-wled-method="GET">GET /json/state</button>
+                <button type="button" class="btn btn--ghost wled-debug-preset" data-wled-path="/json/nodes" data-wled-method="GET">GET /json/nodes</button>
+                <button type="button" class="btn btn--ghost wled-debug-preset" data-wled-path="/json" data-wled-method="GET">GET /json</button>
+                <button type="button" class="btn btn--ghost wled-debug-preset" data-wled-path="/json/state" data-wled-method="POST" data-wled-body='{"on":"t","v":true}'>POST toggle</button>
+                <button type="button" id="btn-wled-debug-refresh" class="btn btn--secondary">Обновить журнал</button>
+              </div>
+              <label class="field">
+                <span>Путь (POST тело — JSON ниже)</span>
+                <input type="text" id="wled-debug-path" value="/json/state" />
+              </label>
+              <label class="field">
+                <span>Тело POST (JSON)</span>
+                <textarea id="wled-debug-body" rows="3" placeholder='{"v":true}'></textarea>
+              </label>
+              <div class="toolbar">
+                <button type="button" id="btn-wled-debug-send" class="btn btn--primary">Выполнить запрос</button>
+                <span id="wled-debug-msg" class="status"></span>
+              </div>
+              <pre id="wled-debug-last" class="hint" style="max-height:220px;overflow:auto;background:#111;color:#eee;padding:10px;border-radius:6px;font-size:12px">—</pre>
+              <p class="hint" style="margin:8px 0 4px">Последнее состояние с платы (<code>/json/state</code>):</p>
+              <pre id="wled-debug-state" class="hint" style="max-height:180px;overflow:auto;background:#1a1a2e;color:#cce;padding:10px;border-radius:6px;font-size:12px">—</pre>
+              <p class="hint" style="margin:8px 0 4px">Журнал обмена:</p>
+              <pre id="wled-debug-log" class="hint" style="max-height:240px;overflow:auto;background:#111;color:#aaa;padding:10px;border-radius:6px;font-size:11px">—</pre>
+            </details>
+          </details>
+
+          <div class="remote-controls" style="margin:0 0 10px;flex-wrap:wrap">
+            <div class="rc-group">
+              <span class="rc-label">Пресет:</span>
+              <button type="button" class="btn btn--ghost chip-preset" data-esp32-preset="white_diffuse" style="color:#111">Белый</button>
+              <button type="button" class="btn btn--ghost chip-preset" data-esp32-preset="rgb_highlight" style="color:#111">RGB</button>
+              <button type="button" class="btn btn--ghost chip-preset" data-esp32-preset="off" style="color:#111">Выкл.</button>
+            </div>
+          </div>
+
+          <div class="remote-controls" style="margin:0;flex-wrap:wrap;align-items:center">
+            <label class="slider" style="flex:1;min-width:200px;margin:0">
+              <span>Яркость — <b id="esp32-brightness-v">80</b>%</span>
+              <input type="range" id="esp32-brightness" min="0" max="100" step="1" value="80" />
+            </label>
+            <label class="field" style="margin:0;min-width:120px">
+              <span>Цвет</span>
+              <input type="color" id="esp32-color" value="#ffffff" />
+            </label>
+            <div class="rc-group">
+              <button type="button" id="btn-esp32-apply" class="btn btn--primary">Применить</button>
+              <button type="button" id="btn-esp32-probe" class="btn btn--secondary">Проверить связь</button>
+            </div>
+          </div>
+          <p id="esp32-msg" class="status" style="margin-top:8px"></p>
+        </div>
+
+        <div id="inspect-status" class="status"></div>
+      </div>
+
+      <div id="inspect-result" class="card result-card" hidden>
+        <h3>Результат инспекции</h3>
+        <div id="inspect-result-modes" class="inspect-result-modes" role="group" aria-label="Режим отображения">
+          <button type="button" class="btn btn--ghost defects-filter-btn" data-defects-filter="all" title="Только исходное фото платы, без рамок и подписей">Полный кадр</button>
+          <button type="button" class="btn btn--ghost defects-filter-btn" data-defects-filter="recognized" title="Все найденные объекты: компоненты и дефекты">Распознанное</button>
+          <button type="button" class="btn btn--ghost defects-filter-btn" data-defects-filter="defects" title="Только дефекты; после проверки — подтверждённые браки">Только дефекты</button>
+        </div>
+        <p class="hint inspect-result-modes-hint">«Полный кадр» — чистое фото; «Распознанное» и «Только дефекты» показывают рамки и список объектов ниже.</p>
+        <div class="result-grid">
+          <div>
+            <div class="result-viewport" id="result-viewport">
+              <div id="result-view-stack" class="result-view-stack">
+                <img id="result-image" alt="Исходное изображение платы" draggable="false" />
+                <canvas id="result-defects-overlay" class="result-defects-overlay" aria-hidden="true"></canvas>
+              </div>
+            </div>
+            <div class="review-zoom result-zoom">
+              <button type="button" class="btn btn--ghost" data-result-zoom="out" style="color:#111">−</button>
+              <input type="range" id="result-zoom-range" min="1" max="6" step="0.1" value="1" />
+              <button type="button" class="btn btn--ghost" data-result-zoom="in" style="color:#111">+</button>
+              <button type="button" class="btn btn--ghost" id="result-zoom-reset" style="color:#111">Сброс</button>
+              <small class="hint">Колесо — масштаб, перетаскивание — сдвиг.</small>
+            </div>
+          </div>
+          <div>
+            <dl class="meta">
+              <dt>№ инспекции:</dt><dd id="res-id">—</dd>
+              <dt>Дата:</dt><dd id="res-date">—</dd>
+              <dt>Устройство:</dt><dd id="res-device">—</dd>
+              <dt>Модель платы:</dt><dd id="res-board-model">—</dd>
+              <dt>Эталон (профиль):</dt><dd id="res-golden-profile">—</dd>
+              <dt>Выравнивание ECC:</dt><dd id="res-golden-align">—</dd>
+              <dt>Файл:</dt><dd id="res-filename">—</dd>
+              <dt>Разрешение:</dt><dd id="res-resolution">—</dd>
+              <dt>Порог достоверности:</dt><dd id="res-conf">—</dd>
+              <dt>Дефектов (по классу):</dt><dd id="res-count">—</dd>
+              <dt>Найдено объектов:</dt><dd id="res-detections">—</dd>
+              <dt>Средняя достоверность:</dt><dd id="res-confidence">—</dd>
+              <dt>Время инференса:</dt><dd id="res-time">—</dd>
+            </dl>
+            <div class="toolbar">
+              <button type="button" id="btn-inspect-clear-view" class="btn btn--ghost" style="color:#374151;border-color:#d1d5db" title="Для оператора: скрытие сохраняется в браузере после перезагрузки, пока не будет новой инспекции">
+                Скрыть результат на экране
+              </button>
+              <button type="button" id="btn-review" class="btn btn--primary" hidden>Оценить дефекты</button>
+              <button type="button" id="btn-review-recognition" class="btn btn--secondary" hidden>Проверить распознавание</button>
+              <a id="btn-pdf" class="btn btn--secondary" download>Скачать PDF</a>
+              <a id="btn-csv" class="btn btn--secondary" download>Скачать CSV</a>
+              <a id="btn-training-zip" class="btn btn--secondary" download hidden>Скачать архив для дообучения</a>
+            </div>
+            <p id="review-status" class="hint"></p>
+          </div>
+        </div>
+
+        <div class="defects-list-head">
+          <h4>Обнаруженные объекты</h4>
+        </div>
+        <div id="defects-list" class="defects-list"></div>
+      </div>
+
+      <!-- Модальное окно: пошаговая оценка дефектов оператором -->
+      <div id="review-modal" class="modal" hidden>
+        <div class="modal-backdrop" data-close></div>
+        <div class="modal-card modal-card--wide">
+          <header class="modal-header">
+            <h3 id="review-title">Оценка дефектов</h3>
+            <button type="button" class="btn btn--ghost" data-close>✕</button>
+          </header>
+          <div class="modal-body">
+            <div class="review-progress">
+              <div class="review-progress__bar"><span id="review-progress-fill"></span></div>
+              <span id="review-progress-label">0 / 0</span>
+            </div>
+
+            <div class="review-meta">
+              <div><b id="review-class">—</b> <small id="review-class-code"></small></div>
+              <div class="review-confidence">
+                Достоверность: <b id="review-confidence">—</b>
+              </div>
+              <div class="review-bbox">
+                Координаты: <span id="review-bbox">—</span>
+              </div>
+            </div>
+
+            <div class="review-viewport" id="review-viewport">
+              <img id="review-image" alt="Кроп дефекта" draggable="false" />
+            </div>
+
+            <div class="review-zoom">
+              <button type="button" class="btn btn--ghost" data-zoom="out" style="color:#111">−</button>
+              <input type="range" id="review-zoom-range" min="1" max="6" step="0.1" value="1.6" />
+              <button type="button" class="btn btn--ghost" data-zoom="in" style="color:#111">+</button>
+              <button type="button" class="btn btn--ghost" id="review-zoom-reset" style="color:#111">Сброс</button>
+              <small class="hint">Колесо мыши — зум, перетаскивание — прокрутка.</small>
+            </div>
+
+            <div class="review-verdict">
+              <button type="button" class="btn btn--danger" id="review-reject">Не брак</button>
+              <button type="button" class="btn btn--secondary" id="review-reject-wrong-class">Ошибка распознавания</button>
+              <button type="button" class="btn btn--primary" id="review-accept">Брак</button>
+            </div>
+            <p id="review-feedback" class="status success" hidden></p>
+
+            <div class="review-nav">
+              <button type="button" class="btn btn--ghost" id="review-prev" style="color:#111">← Назад</button>
+              <button type="button" class="btn btn--ghost" id="review-skip" style="color:#111">Пропустить →</button>
+              <button type="button" class="btn btn--secondary" id="review-submit" hidden>Сохранить результаты</button>
+            </div>
+
+            <p id="review-error" class="status"></p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: журнал -->
+    <article id="tab-history" class="tab-panel">
+      <div class="card">
+        <h2>Журнал инспекций</h2>
+        <form id="history-filter" class="filter-row">
+          <label>С <input type="date" name="from_date" /></label>
+          <label>По <input type="date" name="to_date" /></label>
+          <label>Класс дефекта
+            <select name="class_code">
+              <option value="">— любой —</option>
+            </select>
+          </label>
+          <label class="is-hidden-operator">Оператор
+            <select name="operator_id">
+              <option value="">— все —</option>
+            </select>
+          </label>
+          <label>Устройство
+            <select name="device_id">
+              <option value="">— все —</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn--primary">Обновить</button>
+          <button type="button" id="btn-history-clear-view" class="btn btn--ghost" title="Не удаляет записи на сервере">
+            Очистить список на экране
+          </button>
+          <button type="button" id="btn-history-unhide-local" class="btn btn--secondary" hidden>
+            Показать скрытые записи
+          </button>
+          <button type="button" id="btn-history-purge-server" class="btn btn--danger is-hidden-operator is-hidden-non-admin" title="Удалить все инспекции в базе и файлы">
+            Удалить всё на сервере…
+          </button>
+        </form>
+        <p class="hint">Для <strong>оператора</strong>: «Очистить список на экране» запоминается в этом браузере — строки не вернутся после F5. «Показать скрытые записи» сбрасывает только локальный фильтр.</p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>№</th><th>Дата</th><th>Оператор</th><th>Устройство</th><th>Модель платы</th><th>Файл</th>
+                <th>Деф.</th><th>Ср. Dовер.</th><th>Время</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="history-body"><tr><td colspan="10" class="empty">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: устройства -->
+    <article id="tab-devices" class="tab-panel">
+      <div class="card is-hidden-operator">
+        <h2>Подключить телефон как камеру</h2>
+        <p class="hint">Этот раздел доступен руководителю и администратору на компьютере.</p>
+        <ol class="hint hint-steps">
+          <li>Придумайте понятное имя (например «Стол №3») и нажмите «Создать и получить ссылку».</li>
+          <li>На экране появятся ссылка и QR-код — откройте их на смартфоне (удобно отсканировать QR камерой телефона).</li>
+          <li>Разрешите доступ к камере — телефон начнёт передавать изображение в систему контроля.</li>
+        </ol>
+        <p class="hint">Ссылку может открыть любой телефон; привязка к конкретной модели или серийному номеру не требуется.</p>
+
+        <form id="device-form" class="filter-row">
+          <label>Имя камеры <input name="name" required minlength="1" maxlength="128" placeholder="Например: Стол №3, Смена А" /></label>
+          <label>Примечание <input name="description" maxlength="512" placeholder="Необязательно" /></label>
+          <button type="submit" class="btn btn--primary">Создать и получить ссылку</button>
+        </form>
+        <p id="device-msg" class="status"></p>
+      </div>
+
+      <div class="card">
+        <h2>Список устройств</h2>
+        <p id="device-list-hint" class="hint">Чтобы начать инспекцию, «возьмите устройство в работу». Удаление камеры — только администратор.</p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Имя</th><th>Статус</th><th class="is-hidden-operator">Закреплён за</th><th>Занято</th><th>С</th><th>Кто подключил</th><th>Активно</th><th></th></tr>
+            </thead>
+            <tbody id="devices-body"><tr><td colspan="8" class="empty">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Модальное окно со ссылкой/QR для телефона -->
+      <div id="link-modal" class="modal" hidden>
+        <div class="modal-backdrop" data-close></div>
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3 id="link-title">Ссылка для телефона</h3>
+            <button type="button" class="btn btn--ghost" data-close>✕</button>
+          </header>
+          <div class="modal-body">
+            <p class="hint">Откройте ссылку на смартфоне или отсканируйте QR-код. Телефон и компьютер должны быть в одной Wi‑Fi сети. Разрешите доступ к камере — после этого изображение пойдёт в систему.</p>
+            <p id="link-hint-lan" class="status warn" hidden>
+              Ссылка ведёт на <code>localhost</code> — с телефона она не откроется. Portable-сборка подставляет LAN-IP автоматически (см. строку <code>Phone/meta:</code> в консоли). Нажмите «Ссылка/QR» ещё раз. Если предупреждение остаётся: откройте АОИ в браузере ПК по <strong>IP в Wi‑Fi</strong> (<code>https://192.168.x.x:8000</code>) или задайте <code>PUBLIC_BASE_URL</code> в <code>.env</code> и перезапустите сервер.
+            </p>
+            <div class="link-url-row">
+              <input id="link-url" type="text" readonly />
+              <button type="button" id="link-copy" class="btn btn--secondary">Копировать</button>
+            </div>
+            <div id="link-qr" class="qr-wrap" aria-label="QR-код ссылки"></div>
+            <div class="toolbar">
+              <button type="button" id="link-regen" class="btn btn--danger">Сгенерировать новый токен</button>
+              <a id="link-open" class="btn btn--secondary" target="_blank" rel="noopener">Открыть у себя</a>
+            </div>
+            <p id="link-msg" class="status"></p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: статистика -->
+    <article id="tab-stats" class="tab-panel">
+      <div class="card">
+        <h2>Сводная статистика</h2>
+        <form id="stats-filter" class="filter-row">
+          <label>С <input type="date" name="from_date" /></label>
+          <label>По <input type="date" name="to_date" /></label>
+          <label>Быстрый период
+            <select id="stats-quick">
+              <option value="">—</option>
+              <option value="7">Последние 7 дней</option>
+              <option value="30">Последние 30 дней</option>
+              <option value="90">Последние 90 дней</option>
+              <option value="month">Текущий месяц</option>
+              <option value="year">Текущий год</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn--primary">Обновить</button>
+          <button type="button" id="btn-stats-xlsx" class="btn btn--secondary">Скачать Excel</button>
+          <button type="button" id="btn-stats-purge-server" class="btn btn--danger is-hidden-operator is-hidden-non-admin" title="То же, что очистка журнала: все инспекции удаляются с сервера">
+            Удалить все данные журнала…
+          </button>
+        </form>
+
+        <div class="kpi-grid">
+          <div class="kpi"><span class="kpi-label">Инспекций</span><span id="kpi-total" class="kpi-value">—</span></div>
+          <div class="kpi"><span class="kpi-label">С дефектами</span><span id="kpi-def" class="kpi-value">—</span></div>
+          <div class="kpi"><span class="kpi-label">Чистых</span><span id="kpi-clean" class="kpi-value">—</span></div>
+          <div class="kpi"><span class="kpi-label">Всего дефектов</span><span id="kpi-defects" class="kpi-value">—</span></div>
+        </div>
+
+        <h3>Динамика по дням</h3>
+        <div id="chart-daily" class="chart" role="img" aria-label="График инспекций и дефектов по дням">
+          <p class="hint">Нет данных</p>
+        </div>
+
+        <h3>По дню недели</h3>
+        <div id="chart-weekday" class="chart" role="img" aria-label="График по дню недели"></div>
+
+        <h3>По классам дефектов</h3>
+        <div class="bars" id="stats-classes"></div>
+
+        <h3>По операторам</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Оператор</th><th>ФИО</th><th>Инспекций</th><th>Дефектов</th></tr></thead>
+            <tbody id="stats-operators"></tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: пользователи -->
+    <article id="tab-users" class="tab-panel">
+      <div class="card">
+        <h2>Пользователи</h2>
+        <p class="hint">Создание, смена пароля и удаление — только администратор. Руководитель может блокировать сотрудников.</p>
+        <form id="user-form" class="filter-row is-hidden-non-admin">
+          <label>Логин <input name="username" required minlength="3" maxlength="64" pattern="^[A-Za-z0-9_.\-]+$" /></label>
+          <label>ФИО <input name="full_name" maxlength="128" /></label>
+          <label>Пароль <input type="password" name="password" required minlength="8" maxlength="128" /></label>
+          <label>Роль
+            <select name="role">
+              <option value="operator">Сотрудник</option>
+              <option value="manager">Руководитель</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn--primary">Создать</button>
+        </form>
+        <p id="user-msg" class="status"></p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Логин</th><th>ФИО</th><th>Роль</th><th>Активен</th><th>Блокировка до</th><th></th></tr></thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: датасеты -->
+    <article id="tab-datasets" class="tab-panel">
+      <div class="card">
+        <h2>Датасеты (веса модели детекции)</h2>
+        <p class="hint">Загрузите файл весов YOLO (<code>.pt</code>, <code>.pth</code>, <code>.onnx</code> или <code>.engine</code>), нажмите «Сделать основным» — он будет использоваться для всех инспекций и live-анализа. Кнопка «Отключить» у активного датасета возвращает детектор к весам по умолчанию из конфигурации (файл не удаляется).</p>
+
+        <form id="dataset-form" class="filter-row" enctype="multipart/form-data">
+          <label>Название <input name="name" required minlength="1" maxlength="128" placeholder="Напр.: yolov8n_deeppcb_v2" /></label>
+          <label>Описание <input name="description" maxlength="1024" placeholder="Версия/параметры обучения" /></label>
+          <label>Файл весов <input name="file" type="file" accept=".pt,.pth,.onnx,.engine" required /></label>
+          <label class="toggle-inline">
+            <input type="checkbox" name="activate" />
+            <span>Сразу сделать основным</span>
+          </label>
+          <button type="submit" class="btn btn--primary">Загрузить</button>
+        </form>
+        <p id="dataset-msg" class="status"></p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Название</th><th>Размер</th><th>Файл</th><th>Загружен</th><th>Кем</th><th>Статус</th><th></th></tr>
+            </thead>
+            <tbody id="datasets-body"><tr><td colspan="7" class="empty">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: настройки -->
+    <article id="tab-settings" class="tab-panel">
+      <div class="card">
+        <h2>Настройки системы</h2>
+        <p class="hint">Параметры применяются ко всем новым инспекциям. Live-анализ использует те же значения.</p>
+
+        <form id="settings-form" class="settings-form">
+          <label class="slider">
+            <span>Минимальная достоверность дефекта (conf) — <b id="s-conf-v">0.25</b></span>
+            <input type="range" name="detection_conf_threshold" min="0.05" max="0.95" step="0.01" value="0.25" />
+            <small>Дефекты с вероятностью ниже этого значения не будут показаны. Облегчает поиск реальных дефектов.</small>
+          </label>
+
+          <label class="slider">
+            <span>Порог NMS по IoU — <b id="s-iou-v">0.45</b></span>
+            <input type="range" name="detection_iou_threshold" min="0.1" max="0.9" step="0.01" value="0.45" />
+            <small>Чем меньше — тем агрессивнее подавление пересекающихся рамок.</small>
+          </label>
+
+          <label class="slider">
+            <span>Интервал live-анализа, мс — <b id="s-int-v">1200</b></span>
+            <input type="range" name="live_analysis_interval_ms" min="400" max="5000" step="100" value="1200" />
+            <small>Период между отправкой кадров при включённом режиме «Live».</small>
+          </label>
+
+          <label class="slider">
+            <span>Макс. сторона кадра live-анализа, пикс. — <b id="s-side-v">640</b></span>
+            <input type="range" name="live_analysis_max_side" min="320" max="1280" step="32" value="640" />
+            <small>Кадр уменьшается перед отправкой: чем меньше — тем быстрее, но ниже точность.</small>
+          </label>
+
+          <div class="toolbar">
+            <button type="submit" class="btn btn--primary">Сохранить</button>
+            <span id="settings-msg" class="status"></span>
+          </div>
+        </form>
+
+        <div id="class-semantics-card" class="settings-form" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+          <h3>Классы модели детекции</h3>
+          <p class="hint">Укажите, что означает каждый класс (элемент / дефект / не учитывать) и нужна ли ручная оценка «брак». Для классов «компонент» сервер дополнительно проверяет угол установки (настройка на бэкенде).</p>
+          <div id="class-semantics-wrap" class="table-wrap"></div>
+          <div class="toolbar" style="margin-top:10px">
+            <button type="button" id="btn-save-semantics" class="btn btn--primary">Сохранить классы</button>
+            <span id="semantics-msg" class="status"></span>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: журнал аудита (руководитель и администратор) -->
+    <article id="tab-audit" class="tab-panel">
+      <div class="card">
+        <h2>Журнал действий</h2>
+        <p id="audit-hint" class="hint">Записи о входе, инспекциях и работе с устройствами. Технический лог сервера также пишется в файл <code>logs/aoi.log</code>.</p>
+
+        <form id="audit-filter" class="filter-row">
+          <label>С <input type="date" name="from_date" /></label>
+          <label>По <input type="date" name="to_date" /></label>
+          <label>Пользователь
+            <select name="user_id">
+              <option value="">— все —</option>
+            </select>
+          </label>
+          <label>Действие
+            <select name="action">
+              <option value="">— все —</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn--primary">Показать</button>
+          <button type="button" id="btn-audit-export" class="btn btn--secondary">Скачать CSV</button>
+        </form>
+        <p id="audit-msg" class="status"></p>
+        <p id="audit-summary" class="hint"></p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Подробности</th><th>IP</th></tr>
+            </thead>
+            <tbody id="audit-body"><tr><td colspan="6" class="empty">Откройте вкладку для загрузки</td></tr></tbody>
+          </table>
+        </div>
+        <div class="toolbar" id="audit-pager" hidden>
+          <button type="button" id="btn-audit-prev" class="btn btn--ghost" style="color:#111">← Назад</button>
+          <span id="audit-page-info" class="hint"></span>
+          <button type="button" id="btn-audit-next" class="btn btn--ghost" style="color:#111">Вперёд →</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Вкладка: эталоны Golden Board (только администратор) -->
+    <article id="tab-golden-boards" class="tab-panel">
+      <div class="card">
+        <h2>Эталоны плат (Golden Board)</h2>
+        <p class="hint">Администратор и руководитель: просмотр эталонов, закрепление за сотрудниками, загрузка снимка и разметка зон. При инспекции сотрудник выбирает эталон только из закреплённых за ним. Удаление профиля — только администратор.</p>
+
+        <form id="golden-new-form" class="filter-row" style="margin-bottom:1rem">
+          <label>Название <input name="name" required maxlength="255" placeholder="Напр.: Плата PSU rev.B" /></label>
+          <label>Модель платы <input name="board_model" maxlength="255" placeholder="Артикул / ревизия" /></label>
+          <button type="submit" class="btn btn--primary">Создать профиль</button>
+        </form>
+        <p id="golden-list-msg" class="status"></p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>ID</th><th>Название</th><th>Модель</th><th>Закреплён за</th><th>Снимок</th><th></th></tr>
+            </thead>
+            <tbody id="golden-boards-body"><tr><td colspan="6" class="empty">Откройте вкладку для загрузки списка</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="golden-board-editor" class="card" hidden>
+        <h3 id="golden-editor-title">Эталон</h3>
+        <p id="golden-editor-hint" class="hint"></p>
+
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <label class="btn btn--secondary" style="cursor:pointer;margin:0">
+            Загрузить опорный снимок
+            <input type="file" id="golden-ref-file" accept="image/jpeg,image/png" hidden />
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.9rem">
+            <input type="checkbox" id="golden-auto-markup-upload" checked />
+            Авторазметка YOLO после загрузки
+          </label>
+          <button type="button" id="btn-golden-auto-markup" class="btn btn--secondary">Переразметить YOLO</button>
+          <label>Класс для новой рамки
+            <select id="golden-expected-class" title="Подставляется при рисовании; у каждой зоны можно сменить отдельно">
+              <option value="">— любой объект —</option>
+            </select>
+          </label>
+          <button type="button" id="btn-golden-save-markup" class="btn btn--primary">Сохранить разметку</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.9rem" title="Насколько можно сдвинуть рамку зоны при проверке">
+            Погрешность зоны, px
+            <input type="number" id="golden-region-tolerance-px" min="0" max="128" step="1" value="12" style="width:4.5rem" />
+          </label>
+          <button type="button" id="btn-golden-draw-marker" class="btn btn--ghost" style="color:#111;border-color:#d1d5db" title="Рисовать маркер полярности (синяя рамка)">Маркер полярности</button>
+          <button type="button" id="btn-golden-clear-local" class="btn btn--ghost" style="color:#111;border-color:#d1d5db">Очистить рамки (не сохранено)</button>
+          <button type="button" id="btn-golden-delete-profile" class="btn btn--danger is-hidden-non-admin">Удалить профиль…</button>
+          <span id="golden-editor-msg" class="status"></span>
+        </div>
+
+        <div class="golden-editor-layout">
+          <div class="camera golden-markup-wrap">
+            <div class="camera-zoom-stack">
+              <img id="golden-ref-img" alt="Опорный снимок эталона" draggable="false" />
+              <canvas id="golden-ref-canvas" class="overlay" aria-hidden="true"></canvas>
+            </div>
+          </div>
+          <aside class="golden-regions-panel card" style="margin-top:0">
+            <h4 style="margin:0 0 8px">Зоны разметки</h4>
+            <p class="hint" style="margin-top:0">Классы — из активной модели. Для полярности: включите «Проверять», укажите тип (конденсатор / диод / МК) и нарисуйте <strong>синюю</strong> рамку на маркере (полоска катода, pin1).</p>
+            <div id="golden-regions-list" class="golden-regions-list">
+              <p class="hint empty-hint">Нет зон — нарисуйте рамку на снимке</p>
+            </div>
+          </aside>
+        </div>
+        <p class="hint">Зелёная рамка — зона компонента (Shift — новая поверх). Синяя пунктирная — маркер полярности. «Погрешность зоны» — допуск смещения при проверке (12 px по умолчанию).</p>
+      </div>
+    </article>
+
+    <footer class="footer">
+      АОИ-Web ВКР.2026.Паксин П. П.
+      <a href="/docs" target="_blank" rel="noopener">OpenAPI</a>
+    </footer>
+  </section>
+
+  <script type="module" src="/static/app.js?v=47"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+# Portable-сборка Windows (PyInstaller). Долго (~20–40 мин), много места на диске.
+name: Portable Windows
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: portable-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Prepare bundle inputs
+        shell: pwsh
+        run: python -m scripts.ci_prepare_portable_bundle
+
+      - name: PyInstaller
+        shell: pwsh
+        working-directory: build
+        run: |
+          pyinstaller --noconfirm `
+            --workpath pyinstaller_ci `
+            --distpath ../dist_ci `
+            AOI-Web-Portable-HTTPS.spec
+
+      - name: Smoke startup
+        shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          $exe = Resolve-Path "dist_ci\AOI-Web-Portable-HTTPS\AOI-Web-Portable-HTTPS.exe"
+          $dir = Split-Path $exe
+          python scripts\smoke_portable_startup.py $exe $dir
+
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $ver = "${{ github.ref_name }}" -replace '^v',''
+          } else {
+            $ver = "main-${{ github.sha }}".Substring(0, 12)
+          }
+          $zip = "dist\AOI-Web-Portable-HTTPS-$ver-win64.zip"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "dist_ci\AOI-Web-Portable-HTTPS\*" -DestinationPath $zip -CompressionLevel Optimal
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-win64
+          path: ${{ env.ZIP_PATH }}
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_PATH }}
+          generate_release_notes: true
