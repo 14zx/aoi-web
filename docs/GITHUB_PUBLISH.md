@@ -142,7 +142,7 @@ git push origin v1.0.0
 
 - Сборка только **Windows** (как локальный `build_portable_https.bat`).
 - Учитывается лимит минут GitHub (для private-репозиториев — по тарифу).
-- Веса `.pt` в git не хранятся — в portable может не быть модели; положите `models\*.pt` в релиз отдельно или скачайте через админку после первого запуска.
+- Веса `.pt` в git не хранятся. Перед portable: заполните `models/` (см. [models/README.md](../models/README.md)), затем `.\scripts\package_models_release.ps1` и прикрепите **AOI-Web-models-*.zip** к отдельному Release.
 
 Первый запуск portable на новом репозитории: убедитесь, что workflow-файлы уже в `main` (`git push`).
 

@@ -133,6 +133,32 @@ gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 Перед gunicorn настраивается обратный прокси (nginx) с SSL-сертификатом — как того
 требует п. 4.5.4 ТЗ (обмен только по HTTPS).
 
+## Веса моделей (отдельно от исходников в Git)
+
+Файлы нейросети (`*.pt`, ~150 МБ и больше) **не входят** в основной репозиторий
+GitHub — только код, конфиги и описание структуры.
+
+| Что в Git | Что отдельно |
+|-----------|----------------|
+| `models/README.md`, `manifest.yaml`, `unified_classes.yaml` | все `*.pt`, архив весов |
+| скрипты `download_pretrained`, `download_datasets` | Release **AOI-Web-models.zip** |
+
+**Подробно:** [models/README.md](models/README.md)
+
+Кратко:
+
+1. **Архив с диплома / Release** — распаковать в корень проекта → каталог `models/`.
+2. **Скачать из сети** — `python -m scripts.download_pretrained` и/или `download_datasets`.
+3. **Проверка** — `python -m scripts.verify_models`.
+
+Собрать ZIP для выкладки в GitHub Releases (на машине, где уже лежат веса):
+
+```powershell
+.\scripts\package_models_release.ps1 -Version 1.0.0
+```
+
+Файл `dist/AOI-Web-models-1.0.0.zip` прикрепите к релизу **вручную** (отдельно от portable-сборки).
+
 ## Модель детекции
 
 ### Вариант 1 (быстрый): готовые публичные веса

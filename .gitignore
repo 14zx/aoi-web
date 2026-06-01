@@ -17,10 +17,14 @@ env/
 *.sqlite*
 storage/
 logs/
+# Веса YOLO — только вне Git (см. models/README.md, Release AOI-Web-models.zip)
 models/*.pt
 models/**/*.pt
 models.rar
 *.rar
+!models/README.md
+!models/manifest.yaml
+!models/**/.gitkeep
 runs/
 
 # IDE
