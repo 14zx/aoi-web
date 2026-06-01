@@ -1,0 +1,14 @@
+path: C:/Users/Neizy/3D Objects/diplome/diplome/datasets/unified
+train: images/train
+val: images/val
+names:
+  0: open
+  1: short
+  2: mousebite
+  3: spur
+  4: copper
+  5: pinhole
+  6: solder_bridge
+  7: solder_cold
+  8: component_missing
+  9: component_misaligned

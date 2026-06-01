@@ -1,0 +1,112 @@
+# Единый реестр классов модели АОИ.
+#
+# Этот файл — ЕДИНСТВЕННЫЙ источник правды о составе классов. Его читают:
+#   * скрипты подготовки датасетов (scripts/prepare_datasets.py),
+#   * скрипт обучения (scripts/train_unified.py),
+#   * агрегация оценок оператора (scripts/aggregate_reviews.py),
+#   * (опционально) детектор при старте, если включить режим extended_classes.
+#
+# Порядок ключей в `classes:` задаёт class_id для YOLO (0, 1, 2, ...). Менять
+# его после обучения нельзя — тогда разметка всех уже обученных моделей
+# «поплывёт». Добавлять новые классы можно только в конец списка.
+#
+# Поля:
+#   code         короткий ASCII-идентификатор (используется в БД и API)
+#   name         отображаемое имя (русский)
+#   color        цвет рамки в UI (#RRGGBB)
+#   category     defect | solder | component — для фильтрации в отчётах
+#   is_defect    считать ли обнаружение браком (true) или
+#                информационным (false — например, корректно установленный компонент)
+#   aliases      список возможных имён в публичных датасетах; используется
+#                для маппинга при подготовке YOLO-разметки
+#
+# ---------------------------------------------------------------------------
+
+version: 1
+image_size: 640        # imgsz для train/val
+base_weights: yolov8s.pt  # стартовые веса для transfer learning
+
+classes:
+  # --- бездефектная PCB (ТЗ п. 4.1.2, DeepPCB/HRIPCB) ---
+  - code: open
+    name: Обрыв
+    color: "#FF4136"
+    category: defect
+    is_defect: true
+    aliases: [open, open_circuit, opencircuit, broken, trace_break]
+  - code: short
+    name: Короткое замыкание
+    color: "#FFDC00"
+    category: defect
+    is_defect: true
+    aliases: [short, short_circuit, shortcircuit]
+  - code: mousebite
+    name: Мышиный укус
+    color: "#2ECC40"
+    category: defect
+    is_defect: true
+    aliases: [mousebite, mouse_bite]
+  - code: spur
+    name: Медная шпора
+    color: "#0074D9"
+    category: defect
+    is_defect: true
+    aliases: [spur]
+  - code: copper
+    name: Паразитная медь
+    color: "#B10DC9"
+    category: defect
+    is_defect: true
+    aliases: [copper, spurious_copper, spuriouscopper, excess_copper]
+  - code: pinhole
+    name: Пропущенное отверстие
+    color: "#FF851B"
+    category: defect
+    is_defect: true
+    aliases: [pinhole, pin_hole, missing_hole, missinghole, hole_missing]
+
+  # --- дефекты пайки (PCBA, welding/solder joints) ---
+  - code: solder_bridge
+    name: Перемычка припоя
+    color: "#E91E63"
+    category: solder
+    is_defect: true
+    aliases: [bridge, solder_bridge, bridging, solder_short]
+  - code: solder_cold
+    name: Холодная пайка
+    color: "#9C27B0"
+    category: solder
+    is_defect: true
+    aliases:
+      - cold_solder
+      - cold_joint
+      - bad_weld
+      - insufficient_solder
+      - poor_solder
+      - dry_joint
+      - dryjoint
+
+  # --- монтаж компонентов (PCBA) ---
+  - code: component_missing
+    name: Отсутствие компонента
+    color: "#FF5722"
+    category: component
+    is_defect: true
+    aliases:
+      - missing_component
+      - component_missing
+      - missing
+      - tombstone        # tombstoning — «надгробный камень», одна сторона оторвалась
+  - code: component_misaligned
+    name: Смещение / неправильная ориентация
+    color: "#FFC107"
+    category: component
+    is_defect: true
+    aliases:
+      - misaligned
+      - misalignment
+      - wrong_orientation
+      - flipped
+      - rotated
+      - shifted
+      - wrong_polarity

@@ -1,0 +1,19 @@
+{
+  "per_source": {
+    "ampragatish_pcb6": {
+      "rows": 693,
+      "written": 0
+    },
+    "solder_defects": {
+      "rows": 0,
+      "written": 155
+    }
+  },
+  "per_class": {
+    "solder_cold": 71,
+    "short": 78,
+    "component_misaligned": 292,
+    "copper": 18
+  },
+  "misses": {}
+}

@@ -1,0 +1,111 @@
+# Portable-сборка Windows (PyInstaller). Долго (~20–40 мин), много места на диске.
+name: Portable Windows
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      models_bundle_url:
+        description: "URL ZIP с весами (опционально; иначе Release v1.0.0-models или HuggingFace)"
+        required: false
+        type: string
+
+concurrency:
+  group: portable-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install model weights into models/
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODELS_BUNDLE_URL: ${{ inputs.models_bundle_url || vars.MODELS_BUNDLE_URL || '' }}
+          MODELS_RELEASE_TAG: v1.0.2
+          MODELS_ASSET_NAME: AOI-Web-models-1.0.2.zip
+        run: python -m scripts.ci_install_models
+
+      - name: Verify models before PyInstaller
+        shell: pwsh
+        run: |
+          python -m scripts.verify_models
+          Get-ChildItem models -Recurse -Filter *.pt | Measure-Object -Property Length -Sum |
+            ForEach-Object { "models/*.pt: $($_.Count) files, $([math]::Round($_.Sum/1MB,1)) MB" }
+
+      - name: Prepare bundle inputs
+        shell: pwsh
+        run: python -m scripts.ci_prepare_portable_bundle
+
+      - name: PyInstaller
+        shell: pwsh
+        working-directory: build
+        run: |
+          pyinstaller --noconfirm `
+            --workpath pyinstaller_ci `
+            --distpath ../dist_ci `
+            AOI-Web-Portable-HTTPS.spec
+
+      - name: Smoke startup
+        shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          $exe = Resolve-Path "dist_ci\AOI-Web-Portable-HTTPS\AOI-Web-Portable-HTTPS.exe"
+          $dir = Split-Path $exe
+          python scripts\smoke_portable_startup.py $exe $dir
+
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $ver = "${{ github.ref_name }}" -replace '^v',''
+          } else {
+            $ver = "main-${{ github.sha }}".Substring(0, 12)
+          }
+          $zip = "dist\AOI-Web-Portable-HTTPS-$ver-win64.zip"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "dist_ci\AOI-Web-Portable-HTTPS\*" -DestinationPath $zip -CompressionLevel Optimal
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-win64-with-models
+          path: ${{ env.ZIP_PATH }}
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ env.ZIP_PATH }}
+          make_latest: true
+          generate_release_notes: true

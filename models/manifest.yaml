@@ -1,0 +1,13 @@
+# Expected weight files (see models/README.md). *.pt are not committed to Git.
+version: 1
+
+files:
+  - path: unified_classes.yaml
+    required: true
+    in_git: true
+    description: Unified class registry
+
+  - path: datasets/7/weights.pt
+    required: true
+    in_git: false
+    description: Primary inspection weights (dataset 7)

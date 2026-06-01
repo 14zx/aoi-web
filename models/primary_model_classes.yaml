@@ -1,0 +1,32 @@
+# Primary production weights: models/datasets/7/weights.pt
+# YOLO class_id order (do not reorder after training).
+
+version: 1
+weights: models/datasets/7/weights.pt
+
+yolo_detection:
+  - { id: 0, code: smd_capacitor, name: SMD конденсатор, kind: component }
+  - { id: 1, code: diode, name: Диод, kind: component }
+  - { id: 2, code: ec, name: Электролитический конденсатор, kind: component }
+  - { id: 3, code: ic, name: Микросхема, kind: component }
+  - { id: 4, code: led, name: Светодиод, kind: component }
+  - { id: 5, code: smd_resistor, name: SMD резистор, kind: component }
+  - { id: 6, code: scapacitor, name: Конденсатор (крупный), kind: component }
+  - { id: 7, code: zener, name: Стабилитрон, kind: component }
+  - { id: 8, code: smd_pad, name: SMD площадка, kind: component }
+
+assembly_defects:
+  # Added by Golden Board / inspection pipeline (not separate YOLO heads).
+  - { code: golden_component_missing, name: Нет элемента }
+  - { code: golden_component_wrong, name: Не тот элемент }
+  - { code: golden_polarity_wrong, name: Неверная полярность }
+  - { code: placement_tilt, name: Смещение / ориентация }
+
+legacy_trace_defects:
+  # Only when using public PCB-trace presets; normalized via CLASS_ALIASES in detector.py
+  - open
+  - short
+  - mousebite
+  - spur
+  - copper
+  - pinhole

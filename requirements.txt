@@ -1,0 +1,46 @@
+# ===== Веб-фреймворк и сервер =====
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+
+# ===== База данных / ORM =====
+SQLAlchemy==2.0.35
+alembic==1.13.3
+psycopg2-binary==2.9.9  # для PostgreSQL; в dev-режиме используется SQLite
+
+# ===== Валидация и конфигурация =====
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# ===== Аутентификация и безопасность =====
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.3.0
+
+# ===== Компьютерное зрение и ML =====
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+PyYAML>=6.0  # конфиг unified_classes.yaml / data.yaml
+# PyTorch/Ultralytics ставятся отдельно под конкретную платформу (см. README).
+# В случае отсутствия ultralytics приложение работает с fallback-детектором.
+ultralytics==8.3.2 ; platform_system != "Darwin" or platform_machine != "arm64"
+# Опционально — только если подтягиваете датасеты с Hugging Face
+# (scripts/prepare_datasets.py). Не нужно для запуска приложения.
+# datasets>=2.18.0
+# huggingface_hub>=0.23.0
+
+# ===== Отчёты =====
+reportlab==4.2.2
+openpyxl==3.1.5
+
+# ===== Логирование =====
+python-json-logger==2.0.7
+
+# ===== WLED: авто-поиск в LAN (mDNS _wled._tcp) =====
+zeroconf==0.146.2
+
+# ===== Тестирование =====
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx==0.27.2

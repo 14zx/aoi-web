@@ -1,0 +1,1 @@
+{"input_size": 640, "task": "instance-segmentation", "ultralyticsplus_version": "0.0.23", "ultralytics_version": "8.0.21", "model_type": "v8", "score_map50": 0.51186, "score_map50_mask": 0.51667}

@@ -1,0 +1,61 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv_local/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# среда
+.env
+.env.local
+
+# БД, хранилище, логи
+*.db
+*.sqlite*
+storage/
+logs/
+# Веса YOLO — только вне Git (см. models/README.md, Release AOI-Web-models.zip)
+models/*.pt
+models/**/*.pt
+models.rar
+*.rar
+!models/README.md
+!models/manifest.yaml
+!models/**/.gitkeep
+runs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# локальные TLS-сертификаты (mkcert и т.п.)
+certs/*.pem
+
+# локальные архивы / черновые веса вне models/datasets
+archive/
+*.7z
+models/checkpoints/*.pt
+datasets/_cache/
+
+# одноразовые скрипты правки документов / сторонние утилиты
+scripts/_*.py
+watch_codes.py
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Сборка portable (в релиз GitHub — только ZIP, не весь build/)
+build/pyinstaller_*/
+build/portable_dist_*/
+build/_portable_migrate_stash/
+dist/
+release/
+*.zip
+
+# Локальные утилиты вне дипломного ПО
+val_assistant/
