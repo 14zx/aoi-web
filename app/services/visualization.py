@@ -36,6 +36,26 @@ for _code, _hex in {
     _COLOR_BY_CODE.setdefault(_code, _hex_to_bgr(_hex))
 
 
+def _draw_outline(
+    img: np.ndarray,
+    defect: DetectedDefect,
+    color: tuple[int, int, int],
+    thickness: int,
+) -> None:
+    """Рисует контур сегментации (если есть) с полупрозрачной заливкой, иначе bbox."""
+    poly = getattr(defect, "polygon", None)
+    if poly and len(poly) >= 3:
+        pts = np.asarray(poly, dtype=np.int32).reshape(-1, 1, 2)
+        overlay = img.copy()
+        cv2.fillPoly(overlay, [pts], color)
+        cv2.addWeighted(overlay, 0.25, img, 0.75, 0, dst=img)
+        cv2.polylines(
+            img, [pts], isClosed=True, color=color, thickness=thickness, lineType=cv2.LINE_AA
+        )
+    else:
+        cv2.rectangle(img, (defect.x1, defect.y1), (defect.x2, defect.y2), color, thickness)
+
+
 def render_result_image(
     image_rgb: np.ndarray,
     defects: list[DetectedDefect],
@@ -58,7 +78,7 @@ def render_result_image(
 
     for d in defects:
         color = _COLOR_BY_CODE.get(d.class_code, (0, 255, 0))
-        cv2.rectangle(composed, (d.x1, d.y1), (d.x2, d.y2), color, thickness)
+        _draw_outline(composed, d, color, thickness)
 
         label = f"{d.class_code}: {d.confidence:.2f}"
         (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
@@ -109,7 +129,7 @@ def render_masked_defect_protocol(
 
     for d in defects:
         color = _COLOR_BY_CODE.get(d.class_code, (0, 255, 0))
-        cv2.rectangle(composed, (d.x1, d.y1), (d.x2, d.y2), color, thickness)
+        _draw_outline(composed, d, color, thickness)
 
         label = f"{d.class_code}: {d.confidence:.2f}"
         (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)

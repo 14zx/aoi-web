@@ -23,6 +23,8 @@ class DefectOut(BaseModel):
     bbox_y1: int
     bbox_x2: int
     bbox_y2: int
+    # Контур сегментации [[x, y], ...] для обводки «пиксель-в-пиксель»; None — bbox.
+    polygon: list[list[int]] | None = None
     is_reviewed: bool = False
     is_real_defect: bool = True
     semantic_kind: Literal["defect", "component", "ignore"] = "defect"

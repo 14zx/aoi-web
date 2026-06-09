@@ -424,6 +424,15 @@ function defectRowRejectionKind(d) {
   return 'clean_board';
 }
 
+function hexToRgba(hex, alpha) {
+  const h = String(hex || '').replace('#', '');
+  if (h.length !== 6) return `rgba(34, 197, 94, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function redrawResultDefectOverlay() {
   const data = state.currentInspection;
   const img = $('#result-image');
@@ -468,7 +477,20 @@ function redrawResultDefectOverlay() {
     const bh = y2 - y1;
     ctx.strokeStyle = hex;
     ctx.lineWidth = line;
-    ctx.strokeRect(x1, y1, bw, bh);
+    // Контур сегментации (полигон) рисуем «пиксель-в-пиксель»; иначе — рамку bbox.
+    if (Array.isArray(d.polygon) && d.polygon.length >= 3) {
+      ctx.beginPath();
+      ctx.moveTo(offX + d.polygon[0][0] * scale, offY + d.polygon[0][1] * scale);
+      for (let i = 1; i < d.polygon.length; i++) {
+        ctx.lineTo(offX + d.polygon[i][0] * scale, offY + d.polygon[i][1] * scale);
+      }
+      ctx.closePath();
+      ctx.fillStyle = hexToRgba(hex, 0.22);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(x1, y1, bw, bh);
+    }
     const label = `${d.class_code} ${Number(d.confidence).toFixed(2)}`;
     const padX = 4;
     const padY = 3;

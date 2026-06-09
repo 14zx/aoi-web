@@ -124,6 +124,9 @@ class Defect(Base):
     bbox_y1: Mapped[int] = mapped_column(Integer, nullable=False)
     bbox_x2: Mapped[int] = mapped_column(Integer, nullable=False)
     bbox_y2: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Контур сегментации (JSON: [[x, y], ...]) в пикселях исходного кадра.
+    # NULL — у bbox-моделей и синтетических дефектов постобработки.
+    polygon: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Оператор просмотрел дефект и выставил оценку? По умолчанию — False
     # (модель нашла дефект, но человек его ещё не подтверждал).

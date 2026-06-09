@@ -96,6 +96,26 @@ router = APIRouter(prefix="/api/inspections", tags=["Инспекции"])
 # ---------------------------------------------------------------------------
 # Вспомогательное
 # ---------------------------------------------------------------------------
+def _parse_polygon(raw: str | None) -> list[list[int]] | None:
+    """Разбирает JSON-контур сегментации из БД в список точек [[x, y], ...]."""
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(data, list) or len(data) < 3:
+        return None
+    pts: list[list[int]] = []
+    for p in data:
+        if isinstance(p, (list, tuple)) and len(p) == 2:
+            try:
+                pts.append([int(p[0]), int(p[1])])
+            except (TypeError, ValueError):
+                return None
+    return pts or None
+
+
 def _to_detail(inspection: Inspection, db: Session) -> InspectionDetailOut:
     sem_map = load_mappings(db)
     defects_sorted = sorted(inspection.defects, key=lambda d: d.id)
@@ -140,6 +160,7 @@ def _to_detail(inspection: Inspection, db: Session) -> InspectionDetailOut:
                 bbox_y1=d.bbox_y1,
                 bbox_x2=d.bbox_x2,
                 bbox_y2=d.bbox_y2,
+                polygon=_parse_polygon(getattr(d, "polygon", None)),
                 is_reviewed=d.is_reviewed,
                 is_real_defect=d.is_real_defect,
                 semantic_kind=semantic_kind_for_class(d.class_code, sem_map),
@@ -455,6 +476,9 @@ async def create_inspection(
                     bbox_y1=d.y1,
                     bbox_x2=d.x2,
                     bbox_y2=d.y2,
+                    polygon=json.dumps([[int(px), int(py)] for px, py in d.polygon])
+                    if d.polygon
+                    else None,
                 )
             )
 
@@ -623,6 +647,7 @@ async def live_detect(
                 bbox_y1=d.y1,
                 bbox_x2=d.x2,
                 bbox_y2=d.y2,
+                polygon=[[int(px), int(py)] for px, py in d.polygon] if d.polygon else None,
                 is_reviewed=False,
                 is_real_defect=True,
                 semantic_kind=semantic_kind_for_class(d.class_code, sem_map),

@@ -220,7 +220,13 @@ def registry_class_is_defect(class_code: str) -> bool:
 
 @dataclass(slots=True)
 class DetectedDefect:
-    """Единичный обнаруженный дефект."""
+    """Единичный обнаруженный дефект.
+
+    ``polygon`` — контур сегментации (список точек ``(x, y)`` в пикселях
+    исходного кадра), если модель YOLO-seg вернула маску. Используется для
+    обводки «пиксель-в-пиксель» и точной оценки наклона. ``None`` — у bbox-моделей
+    и у синтетических дефектов постобработки.
+    """
 
     class_code: str
     class_name: str
@@ -229,6 +235,7 @@ class DetectedDefect:
     y1: int
     x2: int
     y2: int
+    polygon: list[tuple[int, int]] | None = None
 
 
 @dataclass(slots=True)
@@ -488,6 +495,11 @@ class Detector:
                 patch = image_rgb[y:y2, x:x2]
                 sub = self._predict_yolo(patch, conf=conf, iou=iou, imgsz=tile)
                 for d in sub:
+                    shifted_poly = (
+                        [(px + x, py + y) for (px, py) in d.polygon]
+                        if d.polygon
+                        else None
+                    )
                     merged.append(
                         DetectedDefect(
                             class_code=d.class_code,
@@ -497,6 +509,7 @@ class Detector:
                             y1=d.y1 + y,
                             x2=d.x2 + x,
                             y2=d.y2 + y,
+                            polygon=shifted_poly,
                         )
                     )
                 x += stride
@@ -537,6 +550,7 @@ class Detector:
         xyxy = boxes.xyxy.cpu().numpy()
         cls = boxes.cls.cpu().numpy().astype(int)
         box_conf = boxes.conf.cpu().numpy()
+        polygons = self._extract_polygons(r, len(xyxy))
         for i in range(len(xyxy)):
             if isinstance(names, dict):
                 code_raw = names.get(int(cls[i]))
@@ -564,9 +578,39 @@ class Detector:
                     y1=int(round(y1)),
                     x2=int(round(x2)),
                     y2=int(round(y2)),
+                    polygon=polygons[i] if i < len(polygons) else None,
                 )
             )
         return defects
+
+    @staticmethod
+    def _extract_polygons(result, n_boxes: int) -> list[list[tuple[int, int]] | None]:
+        """Достаёт контуры сегментации (masks.xy) в порядке боксов.
+
+        Возвращает список длиной ``n_boxes`` (``None`` там, где маски нет либо
+        модель не сегментационная). Контуры упрощаются (approxPolyDP), чтобы не
+        раздувать БД и JSON-ответ.
+        """
+        out: list[list[tuple[int, int]] | None] = [None] * n_boxes
+        masks = getattr(result, "masks", None)
+        if masks is None:
+            return out
+        xy = getattr(masks, "xy", None)
+        if not xy:
+            return out
+        for i, poly in enumerate(xy):
+            if i >= n_boxes:
+                break
+            try:
+                pts = np.asarray(poly, dtype=np.float32)
+                if pts.ndim != 2 or pts.shape[0] < 3:
+                    continue
+                eps = 0.004 * cv2.arcLength(pts.reshape(-1, 1, 2), True)
+                approx = cv2.approxPolyDP(pts.reshape(-1, 1, 2), max(1.0, eps), True)
+                out[i] = [(int(round(p[0][0])), int(round(p[0][1]))) for p in approx]
+            except Exception:  # noqa: BLE001 — маска не критична, пропускаем
+                out[i] = None
+        return out
 
     def _predict_with_task_fallback(
         self,

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from .class_semantics import is_component_class, load_mappings
 from .detector import DetectedDefect
-from .tilt_check import max_axis_tilt_degrees
+from .tilt_check import max_axis_tilt_degrees, tilt_from_polygon
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,12 @@ def apply_component_tilt_rules(
         y2 = min(h, d.y2 + pad)
         if x2 <= x1 + 2 or y2 <= y1 + 2:
             continue
-        crop = rgb[y1:y2, x1:x2]
-        ang = max_axis_tilt_degrees(crop)
+        # Контур сегментации (если модель YOLO-seg) даёт ориентацию точнее,
+        # чем Otsu по кропу bbox. При его отсутствии — старая эвристика.
+        ang = tilt_from_polygon(d.polygon)
+        if ang is None:
+            crop = rgb[y1:y2, x1:x2]
+            ang = max_axis_tilt_degrees(crop)
         if ang is None:
             continue
         if ang <= max_deg:
@@ -54,6 +58,7 @@ def apply_component_tilt_rules(
                 y1=d.y1,
                 x2=d.x2,
                 y2=d.y2,
+                polygon=d.polygon,
             )
         )
         logger.debug(

@@ -12,6 +12,43 @@ import numpy as np
 _MIN_ASPECT_RATIO = 1.25
 
 
+def _deviation_from_rect(rect) -> float | None:
+    """Отклонение длинной оси minAreaRect от ближайшей оси (0/90°), 0..45."""
+    (_, _), (rw, rh), _ = rect
+    if min(rw, rh) < 1.0:
+        return None
+    aspect = max(rw, rh) / max(1.0, min(rw, rh))
+    if aspect < _MIN_ASPECT_RATIO:
+        return None
+    box = cv2.boxPoints(rect)
+    box = np.asarray(box, dtype=np.float32)
+    best_len = 0.0
+    best_theta = 0.0
+    for i in range(4):
+        p, q = box[i], box[(i + 1) % 4]
+        dx, dy = q[0] - p[0], q[1] - p[1]
+        ln = math.hypot(dx, dy)
+        if ln > best_len:
+            best_len = ln
+            best_theta = math.degrees(math.atan2(dy, dx))
+    t = abs(best_theta) % 180.0
+    return float(min(t, abs(90.0 - t)))
+
+
+def tilt_from_polygon(points: list[tuple[int, int]] | None) -> float | None:
+    """Наклон по контуру сегментации — точнее, чем по кропу bbox.
+
+    Возвращает отклонение длинной оси контура от осей (0..45) или ``None``,
+    если контур слишком мал/почти квадратный.
+    """
+    if not points or len(points) < 3:
+        return None
+    pts = np.asarray(points, dtype=np.float32)
+    if cv2.contourArea(pts.reshape(-1, 1, 2)) < 20:
+        return None
+    return _deviation_from_rect(cv2.minAreaRect(pts.reshape(-1, 1, 2)))
+
+
 def max_axis_tilt_degrees(rgb_crop: np.ndarray) -> float | None:
     """Минимальное расстояние до горизонтали/вертикали в градусах для доминантного прямоугольника.
 
@@ -51,29 +88,5 @@ def max_axis_tilt_degrees(rgb_crop: np.ndarray) -> float | None:
     if area > crop_area * 0.95:
         return None
 
-    rect = cv2.minAreaRect(cnt)
-    (_, _), (rw, rh), _ = rect
-    if min(rw, rh) < 1.0:
-        return None
-    aspect = max(rw, rh) / max(1.0, min(rw, rh))
-    if aspect < _MIN_ASPECT_RATIO:
-        # Почти квадрат — длинная ось не определена, наклон не меряем.
-        return None
-
-    box = cv2.boxPoints(rect)
-    box = np.asarray(box, dtype=np.float32)
-    # Длины рёбер и угол самого длинного к горизонту
-    best_len = 0.0
-    best_theta = 0.0
-    for i in range(4):
-        p, q = box[i], box[(i + 1) % 4]
-        dx, dy = q[0] - p[0], q[1] - p[1]
-        ln = math.hypot(dx, dy)
-        if ln > best_len:
-            best_len = ln
-            best_theta = math.degrees(math.atan2(dy, dx))
-
-    # Угол относительно 0° или 90°: брать минимальное отклонение от оси
-    t = abs(best_theta) % 180.0
-    deviation = min(t, abs(90.0 - t))
-    return float(deviation)
+    # Почти квадрат → длинная ось не определена; отсев внутри _deviation_from_rect.
+    return _deviation_from_rect(cv2.minAreaRect(cnt))

@@ -31,6 +31,7 @@ _COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("defects", "is_reviewed", "BOOLEAN DEFAULT 0 NOT NULL"),
     ("defects", "is_real_defect", "BOOLEAN DEFAULT 1 NOT NULL"),
     ("defects", "exclude_from_training", "BOOLEAN DEFAULT 0 NOT NULL"),
+    ("defects", "polygon", "TEXT"),
     ("devices", "upload_token", "VARCHAR(64)"),
     ("devices", "registered_by_id", "INTEGER"),
     ("devices", "last_seen_at", "DATETIME"),
