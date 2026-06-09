@@ -135,6 +135,34 @@ def main() -> int:
         action="store_true",
         help="Не копировать best.pt в models/aoi_unified.pt",
     )
+    # --- Аугментации геометрии (ключевое для распознавания компонентов под углом) ---
+    # У текущих весов diploma обучение шло с degrees=0.0 — модель почти не видела
+    # повёрнутых компонентов, поэтому под углом детектирует/обводит плохо.
+    parser.add_argument(
+        "--degrees",
+        type=float,
+        default=10.0,
+        help="Случайный поворот ±град. при обучении. Для платы в произвольной "
+             "ориентации ставьте 180. Включает устойчивость к наклону. (Ultralytics default=0)",
+    )
+    parser.add_argument(
+        "--perspective",
+        type=float,
+        default=0.0005,
+        help="Перспективное искажение (0..0.001). Имитация съёмки под наклоном.",
+    )
+    parser.add_argument(
+        "--shear",
+        type=float,
+        default=2.0,
+        help="Сдвиг (shear) ±град.",
+    )
+    parser.add_argument(
+        "--scale",
+        type=float,
+        default=0.5,
+        help="Случайный масштаб (gain). Помогает при разном удалении камеры.",
+    )
     args = parser.parse_args()
 
     _sanity_check_data()
@@ -186,6 +214,15 @@ def main() -> int:
         workers=workers,
         exist_ok=True,
         resume=args.resume,
+        # Геометрические аугментации — устойчивость к наклону/повороту компонентов.
+        degrees=args.degrees,
+        perspective=args.perspective,
+        shear=args.shear,
+        scale=args.scale,
+    )
+    logger.info(
+        "  аугментации: degrees=%.1f perspective=%.4f shear=%.1f scale=%.2f",
+        args.degrees, args.perspective, args.shear, args.scale,
     )
     # У YOLO train(..., resume=True) нельзя параллельно с data=... — уберём.
     if args.resume:

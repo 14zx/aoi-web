@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     detection_conf_threshold: float = 0.25
     detection_iou_threshold: float = 0.45
     detection_img_size: int = 640
+    # Анализ всей платы одним кадром (рекомендуется): YOLO сам делает letterbox
+    # до ``detection_full_image_imgsz``, контекст платы не теряется. Тайлинг
+    # (дробление на куски) включайте только если мелкие дефекты теряются —
+    # он рвёт компоненты на стыках плиток и портит распознавание.
+    detection_tiling_enabled: bool = False
+    # imgsz для анализа всего кадра. Чем больше — тем лучше видно мелкие
+    # компоненты на крупном фото (ценой скорости). Кратно 32.
+    detection_full_image_imgsz: int = Field(default=1280, ge=320, le=4096)
     # Тайловый инференс на крупных снимках (может повысить полноту поиска мелких объектов).
     detection_tiling_min_side: int = 1280
     detection_tile_size: int = 640
@@ -108,6 +116,17 @@ class Settings(BaseSettings):
 
     # Порог отклонения ориентации компонента (градусы) — превышение → запись как дефект.
     component_tilt_max_deg: float = 25.0
+
+    # ---- Поиск перемычек припоя (solder bridge) ----
+    # Ищет нежелательный мостик припоя между двумя соседними компонентами/выводами.
+    solder_bridge_check_enabled: bool = True
+    # Максимальный зазор между компонентами (px), который ещё может быть перемкнут.
+    solder_bridge_max_gap_px: int = Field(default=40, ge=2, le=512)
+    # Припой — яркий и малонасыщенный (металлический блик): порог по V (яркость) и S (насыщенность) в HSV.
+    solder_bridge_min_brightness: int = Field(default=170, ge=0, le=255)
+    solder_bridge_max_saturation: int = Field(default=90, ge=0, le=255)
+    # Доля «припойных» пикселей в зоне зазора, при которой считаем мостик подтверждённым.
+    solder_bridge_min_fill: float = Field(default=0.45, ge=0.05, le=1.0)
     # Путь к расширенному реестру классов. Если файл существует и
     # ``use_unified_classes`` включено, детектор использует этот реестр
     # вместо зашитых 6 PCB-классов (PCB + пайка + монтаж компонентов).

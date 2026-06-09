@@ -84,6 +84,7 @@ from ..services.golden_polarity_check import (
 from ..services.golden_region_check import apply_golden_region_checks
 from ..services.post_detection import apply_component_tilt_rules
 from ..services.preprocessing import ImageValidationError, apply_detection_preprocess
+from ..services.solder_bridge_check import find_solder_bridges
 from .deps import has_backoffice_role, require_admin, require_any, require_manager, write_audit
 
 
@@ -420,6 +421,7 @@ async def create_inspection(
             iou_threshold=effective_iou,
         )
         defects = apply_component_tilt_rules(rgb, result.defects, db)
+        defects = find_solder_bridges(rgb, defects, db)
         defects = _apply_golden_region_checks(
             db,
             defects,
@@ -574,6 +576,7 @@ async def live_detect(
         iou_threshold=effective_iou,
     )
     defects = apply_component_tilt_rules(rgb, result.defects, db)
+    defects = find_solder_bridges(rgb, defects, db)
     defects = _apply_golden_region_checks(
         db,
         defects,

@@ -24,6 +24,17 @@ _COLOR_BY_CODE: dict[str, tuple[int, int, int]] = {
     c["code"]: _hex_to_bgr(c["color"]) for c in DEFECT_CLASSES
 }
 
+# Цвета для синтетических кодов постобработки (нет в основном реестре классов),
+# чтобы рамки не сливались в зелёный fallback.
+for _code, _hex in {
+    "placement_tilt": "#FF00FF",
+    "solder_bridge": "#E91E63",
+    "golden_component_missing": "#FF1744",
+    "golden_component_wrong": "#FF9100",
+    "golden_polarity_wrong": "#00E5FF",
+}.items():
+    _COLOR_BY_CODE.setdefault(_code, _hex_to_bgr(_hex))
+
 
 def render_result_image(
     image_rgb: np.ndarray,

@@ -59,7 +59,7 @@ def semantic_kind_for_class(
     class_code: str, mappings: dict[str, dict[str, Any]]
 ) -> SemanticKind:
     """Вид объекта для UI и счётчиков; по умолчанию «дефект», если правило не задано."""
-    if str(class_code).strip() == "placement_tilt":
+    if str(class_code).strip() in ("placement_tilt", "solder_bridge"):
         return "defect"
     if str(class_code).strip() in (
         "golden_component_missing",

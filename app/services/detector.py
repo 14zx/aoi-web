@@ -118,6 +118,7 @@ else:
 CODE_BY_INDEX = {i: c["code"] for i, c in enumerate(DEFECT_CLASSES)}
 NAME_BY_CODE = {c["code"]: c["name"] for c in DEFECT_CLASSES}
 NAME_BY_CODE.setdefault("placement_tilt", "Нарушение ориентации")
+NAME_BY_CODE.setdefault("solder_bridge", "Перемычка припоя")
 NAME_BY_CODE.setdefault("golden_component_missing", "Не найден компонент (эталон)")
 NAME_BY_CODE.setdefault("golden_component_wrong", "Не тот компонент (эталон)")
 NAME_BY_CODE.setdefault("golden_polarity_wrong", "Неверная полярность (эталон)")
@@ -429,13 +430,17 @@ class Detector:
                 max_side = max(h, w)
                 tile = int(settings.detection_tile_size)
                 if (
-                    max_side >= int(settings.detection_tiling_min_side)
+                    bool(getattr(settings, "detection_tiling_enabled", False))
+                    and max_side >= int(settings.detection_tiling_min_side)
                     and min(h, w) >= tile // 2
                 ):
                     defects = self._predict_yolo_tiled(image_rgb, conf=conf, iou=iou)
                     used_tiling = True
                 else:
-                    defects = self._predict_yolo(image_rgb, conf=conf, iou=iou)
+                    # Анализ всей платы одним кадром: imgsz подбираем под размер
+                    # снимка (кратно 32), но не больше потолка и не апскейлим.
+                    imgsz = self._full_image_imgsz(max_side)
+                    defects = self._predict_yolo(image_rgb, conf=conf, iou=iou, imgsz=imgsz)
                 backend = "yolov8"
             else:
                 defects = self._predict_fallback(image_rgb, conf=conf)
@@ -447,6 +452,15 @@ class Detector:
             backend=backend,
             used_tiling=used_tiling,
         )
+
+    @staticmethod
+    def _full_image_imgsz(max_side: int) -> int:
+        """imgsz для анализа всего кадра: кратно 32, не больше потолка, без апскейла."""
+        cap = int(getattr(settings, "detection_full_image_imgsz", 1280))
+        target = min(int(max_side), cap)
+        target = max(320, target)
+        # Округляем вверх до кратного 32 (требование сетки YOLO).
+        return int(((target + 31) // 32) * 32)
 
     def _predict_yolo_tiled(
         self,
@@ -472,7 +486,7 @@ class Detector:
                 if x2 - x < 32 or y2 - y < 32:
                     break
                 patch = image_rgb[y:y2, x:x2]
-                sub = self._predict_yolo(patch, conf=conf, iou=iou)
+                sub = self._predict_yolo(patch, conf=conf, iou=iou, imgsz=tile)
                 for d in sub:
                     merged.append(
                         DetectedDefect(
@@ -502,12 +516,14 @@ class Detector:
         *,
         conf: float,
         iou: float,
+        imgsz: int | None = None,
     ) -> list[DetectedDefect]:
         assert self._model is not None
         results = self._predict_with_task_fallback(
             source=image_rgb,
             conf=conf,
             iou=iou,
+            imgsz=imgsz,
         )
         defects: list[DetectedDefect] = []
         if not results:
@@ -520,7 +536,7 @@ class Detector:
 
         xyxy = boxes.xyxy.cpu().numpy()
         cls = boxes.cls.cpu().numpy().astype(int)
-        conf = boxes.conf.cpu().numpy()
+        box_conf = boxes.conf.cpu().numpy()
         for i in range(len(xyxy)):
             if isinstance(names, dict):
                 code_raw = names.get(int(cls[i]))
@@ -543,7 +559,7 @@ class Detector:
                 DetectedDefect(
                     class_code=code,
                     class_name=name,
-                    confidence=float(conf[i]),
+                    confidence=float(box_conf[i]),
                     x1=int(round(x1)),
                     y1=int(round(y1)),
                     x2=int(round(x2)),
@@ -558,16 +574,15 @@ class Detector:
         source: np.ndarray,
         conf: float,
         iou: float,
+        imgsz: int | None = None,
     ):
         """Запускает predict как в yolo_server.py с task-fallback."""
         assert self._model is not None
+        predict_kwargs: dict = {"conf": conf, "iou": iou, "verbose": False}
+        if imgsz:
+            predict_kwargs["imgsz"] = int(imgsz)
         try:
-            return self._model.predict(
-                source=source,
-                conf=conf,
-                iou=iou,
-                verbose=False,
-            )
+            return self._model.predict(source=source, **predict_kwargs)
         except Exception as exc:
             if "object has no attribute 'shape'" not in str(exc):
                 raise
@@ -590,12 +605,7 @@ class Detector:
                             test_model.model.task = forced_task
                         except Exception:
                             pass
-                    out = test_model.predict(
-                        source=source,
-                        conf=conf,
-                        iou=iou,
-                        verbose=False,
-                    )
+                    out = test_model.predict(source=source, **predict_kwargs)
                     self._model = test_model
                     self._sync_runtime_classes()
                     logger.info("YOLO fallback успешно восстановлен с task='%s'", forced_task)
