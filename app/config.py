@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # ---- Общие ----
     app_name: str = "АОИ-Web"
     app_code: str = "АОИ.01"
-    app_version: str = "1.0.0"
+    app_version: str = "1.0.3"
     debug: bool = False
 
     # ---- Безопасность (ТЗ п. 4.8.1) ----
